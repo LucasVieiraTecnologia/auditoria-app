@@ -975,16 +975,33 @@ with aba_nf:
                     st.markdown(f'<div class="ai-card"><strong>Análise IA</strong><br>{html.escape(explicacao)}</div>', unsafe_allow_html=True)
 
         colunas_nf = [c for c in ['Data', 'Fornecedor', 'Descricao', 'Valor_Real', 'Numero_NF', 'Chave_NF', 'Status_Consulta_NF', 'Link_Consulta_NF', 'Link_Origem_NF', 'Arquivo_NF_Baixado', 'Link_NF'] if c in df_nf_f.columns]
-        st.dataframe(
-            preparar_exibicao(df_nf_f[colunas_nf]),
-            width='stretch',
-            hide_index=True,
-            column_config={
-                'Link_Consulta_NF': st.column_config.LinkColumn('Link consulta NF'),
-                'Link_Origem_NF': st.column_config.LinkColumn('Link original'),
-                'Valor_Real': st.column_config.NumberColumn('Valor', format='R$ %.2f'),
-            },
-        )
+        df_display = preparar_exibicao(df_nf_f[colunas_nf]).copy()
+        
+        # Ensure link columns contain only strings or None for proper LinkColumn rendering
+        if 'Link_Consulta_NF' in df_display.columns:
+            df_display['Link_Consulta_NF'] = df_display['Link_Consulta_Nf'].apply(
+                lambda x: str(x) if pd.notna(x) and str(x).strip() != '' else None
+            )
+        if 'Link_Origem_NF' in df_display.columns:
+            df_display['Link_Origem_NF'] = df_display['Link_Origem_NF'].apply(
+                lambda x: str(x) if pd.notna(x) and str(x).strip() != '' else None
+            )
+        
+        try:
+            st.dataframe(
+                df_display,
+                width='stretch',
+                hide_index=True,
+                column_config={
+                    'Link_Consulta_NF': st.column_config.LinkColumn('Link consulta NF'),
+                    'Link_Origem_NF': st.column_config.LinkColumn('Link original'),
+                    'Valor_Real': st.column_config.NumberColumn('Valor', format='R$ %.2f'),
+                },
+            )
+        except Exception as e:
+            # Fallback to regular dataframe if Arrow conversion fails
+            st.error(f"Erro ao exibir tabela interativa: {str(e)}")
+            st.dataframe(df_display, width='stretch', hide_index=True)
 
         imagens = [p for p in df_nf_f['Link_NF'].dropna().astype(str).unique().tolist() if Path(p).exists()] if 'Link_NF' in df_nf_f.columns else []
         if imagens:
