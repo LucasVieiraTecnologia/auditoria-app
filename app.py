@@ -37,8 +37,8 @@ def get_users():
     """Retorna dicionário de usuários do .env"""
     users = {}
     # Usuário principal
-    user_env = os.getenv('APP_USERNAME', 'admin')
-    pass_env = os.getenv('APP_PASSWORD', 'admin123')
+    user_env = os.getenv('APP_USERNAME', 'Lucas')
+    pass_env = os.getenv('APP_PASSWORD', 'Lucas@3267')
     users[user_env] = hash_password(pass_env)
     
     # Usuários adicionais (APP_USERS=user1:pass1,user2:pass2)
