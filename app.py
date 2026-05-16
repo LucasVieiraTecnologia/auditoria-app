@@ -9,10 +9,12 @@ import re
 import hashlib
 import shutil
 import traceback
+import bcrypt
 from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -22,6 +24,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 import streamlit.components.v1 as components
+from datetime import datetime, timedelta
 
 import rodar_auditoria_script as runner
 
@@ -31,33 +34,196 @@ import rodar_auditoria_script as runner
 import logs_acesso
 
 def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
+    # Generate salt and hash password using bcrypt
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode(), salt)
+    return hashed.decode('utf-8')
 
 def get_users():
-    """Retorna dicionário de usuários do .env"""
-    users = {}
-    # Usuário principal
-    user_env = os.getenv('APP_USERNAME', 'Lucas')
-    pass_env = os.getenv('APP_PASSWORD', 'Lucas@3267')
-    users[user_env] = hash_password(pass_env)
+    """Retorna dicionário de usuários do arquivo users.json (apenas username:password_hash para autenticação)"""
+    users_file = Path('users.json')
     
-    # Usuários adicionais (APP_USERS=user1:pass1,user2:pass2)
-    users_str = os.getenv('APP_USERS', '')
-    if users_str:
-        for pair in users_str.split(','):
-            if ':' in pair:
-                u, p = pair.split(':', 1)
-                users[u.strip()] = hash_password(p.strip())
+    # If users.json doesn't exist, create it from .env
+    if not users_file.exists():
+        users = {}
+        # Usuário principal
+        user_env = os.getenv('APP_USERNAME', 'Lucas')
+        pass_env = os.getenv('APP_PASSWORD', 'Lucas@3267')
+        users[user_env] = hash_password(pass_env)
+        
+        # Usuários adicionais (APP_USERS=user1:pass1,user2:pass2)
+        users_str = os.getenv('APP_USERS', '')
+        if users_str:
+            for pair in users_str.split(','):
+                if ':' in pair:
+                    u, p = pair.split(':', 1)
+                    users[u.strip()] = hash_password(p.strip())
+        
+        # Save to users.json
+        save_users_to_file(users)
+        return users
     
-    return users
+    # Load from users.json
+    try:
+        with open(users_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            users_data = data.get('users', {})
+            
+            # Convert to the expected format (username: password_hash)
+            users = {}
+            for username, user_info in users_data.items():
+                users[username] = user_info.get('password_hash', '')
+            
+            return users
+    except Exception as e:
+        # Fallback to .env if there's an error
+        users = {}
+        user_env = os.getenv('APP_USERNAME', 'Lucas')
+        pass_env = os.getenv('APP_PASSWORD', 'Lucas@3267')
+        users[user_env] = hash_password(pass_env)
+        
+        users_str = os.getenv('APP_USERS', '')
+        if users_str:
+            for pair in users_str.split(','):
+                if ':' in pair:
+                    u, p = pair.split(':', 1)
+                    users[u.strip()] = hash_password(p.strip())
+        
+        return users
+
+def get_all_users():
+    """Retorna dicionário completo de usuários do arquivo users.json"""
+    users_file = Path('users.json')
+    
+    # If users.json doesn't exist, create it from .env
+    if not users_file.exists():
+        users = {}
+        # Usuário principal
+        user_env = os.getenv('APP_USERNAME', 'Lucas')
+        pass_env = os.getenv('APP_PASSWORD', 'Lucas@3267')
+        users[user_env] = {
+            'password_hash': hash_password(pass_env),
+            'role': 'admin',
+            'created_at': datetime.now().isoformat(),
+            'last_login': None,
+            'last_seen': None
+        }
+        
+        # Usuários adicionais (APP_USERS=user1:pass1,user2:pass2)
+        users_str = os.getenv('APP_USERS', '')
+        if users_str:
+            for pair in users_str.split(','):
+                if ':' in pair:
+                    u, p = pair.split(':', 1)
+                    users[u.strip()] = {
+                        'password_hash': hash_password(p.strip()),
+                        'role': 'viewer',
+                        'created_at': datetime.now().isoformat(),
+                        'last_login': None,
+                        'last_seen': None
+                    }
+        
+        # Save to users.json
+        save_all_users_to_file(users)
+        return users
+    
+    # Load from users.json
+    try:
+        with open(users_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            return data.get('users', {})
+    except Exception as e:
+        # Fallback to basic users if there's an error
+        users = {}
+        user_env = os.getenv('APP_USERNAME', 'Lucas')
+        pass_env = os.getenv('APP_PASSWORD', 'Lucas@3267')
+        users[user_env] = {
+            'password_hash': hash_password(pass_env),
+            'role': 'admin',
+            'created_at': datetime.now().isoformat(),
+            'last_login': None,
+            'last_seen': None
+        }
+        
+        users_str = os.getenv('APP_USERS', '')
+        if users_str:
+            for pair in users_str.split(','):
+                if ':' in pair:
+                    u, p = pair.split(':', 1)
+                    users[u.strip()] = {
+                        'password_hash': hash_password(p.strip()),
+                        'role': 'viewer',
+                        'created_at': datetime.now().isoformat(),
+                        'last_login': None,
+                        'last_seen': None
+                    }
+        
+        return users
+
+def save_all_users_to_file(users_dict):
+    """Salva todos os dados dos usuários no arquivo users.json"""
+    users_file = Path('users.json')
+    
+    # Save to file
+    data = {
+        'users': users_dict
+    }
+    
+    with open(users_file, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def update_user_last_seen(username):
+    """Atualiza o timestamp de última visualização do usuário"""
+    users = get_all_users()
+    if username in users:
+        users[username]['last_seen'] = datetime.now().isoformat()
+        save_all_users_to_file(users)
+
+def is_user_online(username, minutes=5):
+    """Verifica se o usuário está online (ativo nos últimos X minutos)"""
+    users = get_all_users()
+    if username not in users or not users[username].get('last_seen'):
+        return False
+    
+    last_seen = datetime.fromisoformat(users[username]['last_seen'])
+    return (datetime.now() - last_seen).total_seconds() < (minutes * 60)
 
 def check_credentials(username: str, password: str) -> bool:
     users = get_users()
-    return username in users and users[username] == hash_password(password)
+    if username in users:
+        hashed_password = users[username]
+        # Check if the hashed_password is a bcrypt hash (starts with $2b$)
+        if hashed_password.startswith('$2b$'):
+            # Verify using bcrypt
+            return bcrypt.checkpw(password.encode(), hashed_password.encode('utf-8'))
+        else:
+            # Fallback for old SHA256 hashes (if any)
+            return hashed_password == hash_password(password)
+    return False
 
 def init_auth():
+    # Check for persistent login via cookies
     if 'authenticated' not in st.session_state:
-        st.session_state['authenticated'] = False
+        # Try to restore from cookies if available
+        authenticated_cookie = st.experimental_get_query_params().get('auth', [''])[0]
+        username_cookie = st.experimental_get_query_params().get('user', [''])[0]
+        
+        if authenticated_cookie == 'true' and username_cookie:
+            # Verify the user still exists
+            users = get_users()
+            if username_cookie in users:
+                st.session_state['authenticated'] = True
+                st.session_state['username'] = username_cookie
+                st.session_state['user_role'] = 'admin' if username_cookie == os.getenv('APP_USERNAME', 'admin') else 'viewer'
+            else:
+                st.session_state['authenticated'] = False
+                st.session_state['username'] = ''
+                st.session_state['user_role'] = 'viewer'
+        else:
+            st.session_state['authenticated'] = False
+            st.session_state['username'] = ''
+            st.session_state['user_role'] = 'viewer'
+    
     if 'username' not in st.session_state:
         st.session_state['username'] = ''
     if 'user_role' not in st.session_state:
@@ -104,6 +270,17 @@ def login_screen():
                 st.session_state['authenticated'] = True
                 st.session_state['username'] = username
                 st.session_state['user_role'] = 'admin' if username == os.getenv('APP_USERNAME', 'admin') else 'viewer'
+                
+                # Update user login info
+                users = get_all_users()
+                if username in users:
+                    users[username]['last_login'] = datetime.now().isoformat()
+                    users[username]['last_seen'] = datetime.now().isoformat()
+                    save_all_users_to_file(users)
+                
+                # Set cookies for persistent login (valid for 7 days)
+                st.experimental_set_query_params(auth='true', user=username)
+                
                 logs_acesso.log_acesso(username, 'LOGIN', detalhes='Login realizado com sucesso')
                 st.rerun()
             else:
@@ -114,6 +291,12 @@ def login_screen():
     st.stop()
 
 init_auth()
+
+# Update last seen timestamp for authenticated users
+if st.session_state.get('authenticated', False):
+    username = st.session_state.get('username', '')
+    if username:
+        update_user_last_seen(username)
 
 if not st.session_state['authenticated']:
     login_screen()
@@ -570,25 +753,134 @@ with st.sidebar:
         st.session_state['authenticated'] = False
         st.session_state['username'] = ''
         st.session_state['user_role'] = 'viewer'
+        # Clear cookies
+        st.experimental_set_query_params()
         st.rerun()
     
     # Logs de acesso (apenas admin)
     if st.session_state.get('user_role') == 'admin':
         st.markdown('---')
-        with st.expander('📊 Logs de Acesso', expanded=False):
-            logs = logs_acesso.ler_logs()
-            if logs:
-                st.write(f'**Total de registros:** {len(logs)}')
-                df_logs = pd.DataFrame(logs)
-                st.dataframe(df_logs.tail(50), hide_index=True, use_container_width=True)
-                if st.button('Limpar Logs', key='clear_logs'):
-                    if LOG_FILE.exists():
-                        LOG_FILE.unlink()
-                    logs_acesso.init_logs()
-                    st.success('Logs limpos!')
-                    st.rerun()
+        
+        # Tabs for different admin functions
+        tab1, tab2, tab3 = st.tabs(["📊 Logs de Acesso", "👥 Usuários Online", "➕ Criar Usuário"])
+        
+        with tab1:
+            with st.expander('📊 Logs de Acesso', expanded=True):
+                logs = logs_acesso.ler_logs()
+                if logs:
+                    st.write(f'**Total de registros:** {len(logs)}')
+                    df_logs = pd.DataFrame(logs)
+                    st.dataframe(df_logs.tail(50), hide_index=True, use_container_width=True)
+                    if st.button('Limpar Logs', key='clear_logs'):
+                        if LOG_FILE.exists():
+                            LOG_FILE.unlink()
+                        logs_acesso.init_logs()
+                        st.success('Logs limpos!')
+                        st.rerun()
+                else:
+                    st.caption('Nenhum log registrado.')
+        
+        with tab2:
+            st.subheader('Usuários Online')
+            st.caption('Usuários que estiveram ativos nos últimos 5 minutos')
+            
+            # Refresh button
+            if st.button('🔄 Atualizar Lista', key='refresh_users'):
+                st.rerun()
+            
+            # Get all users and check online status
+            all_users = get_all_users()
+            online_users = []
+            offline_users = []
+            
+            for username, user_info in all_users.items():
+                if is_user_online(username, minutes=5):
+                    online_users.append((username, user_info))
+                else:
+                    offline_users.append((username, user_info))
+            
+            # Display online users
+            if online_users:
+                st.write(f'**{len(online_users)} usuário(s) online:**')
+                for username, user_info in online_users:
+                    role_badge = "🔴 Admin" if user_info.get('role') == 'admin' else "🟢 Viewer"
+                    last_seen = user_info.get('last_seen')
+                    if last_seen:
+                        last_seen_dt = datetime.fromisoformat(last_seen)
+                        time_str = last_seen_dt.strftime("%H:%M:%S")
+                    else:
+                        time_str = "Nunca"
+                    
+                    st.markdown(f"""
+                    <div style="padding: 10px; border-left: 4px solid #10b981; margin: 5px 0; background-color: #f0fdf4;">
+                        <strong>{username}</strong> {role_badge}<br>
+                        <small>Última atividade: {time_str}</small>
+                    </div>
+                    """, unsafe_allow_html=True)
             else:
-                st.caption('Nenhum log registrado.')
+                st.info('Nenhum usuário online no momento.')
+            
+            # Display offline users (optional)
+            with st.expander(f"Ver usuários offline ({len(offline_users)})"):
+                if offline_users:
+                    for username, user_info in offline_users:
+                        role_badge = "🔴 Admin" if user_info.get('role') == 'admin' else "🟢 Viewer"
+                        last_seen = user_info.get('last_seen')
+                        if last_seen:
+                            last_seen_dt = datetime.fromisoformat(last_seen)
+                            time_str = last_seen_dt.strftime("%d/%m/%Y %H:%M:%S")
+                        else:
+                            time_str = "Nunca"
+                        
+                        st.markdown(f"""
+                        <div style="padding: 8px; border-left: 4px solid #6b7280; margin: 3px 0; background-color: #f9fafb;">
+                            <strong>{username}</strong> {role_badge}<br>
+                            <small>Última atividade: {time_str}</small>
+                        </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.caption('Nenhum usuário cadastrado.')
+        
+        with tab3:
+            st.subheader('Criar Novo Usuário')
+            
+            with st.form("create_user_form"):
+                new_username = st.text_input('Nome de Usuário', placeholder='Digite o nome de usuário')
+                new_password = st.text_input('Senha', type='password', placeholder='Digite a senha')
+                confirm_password = st.text_input('Confirmar Senha', type='password', placeholder='Confirme a senha')
+                user_role = st.selectbox('Perfil', ['viewer', 'admin'], help='admin: acesso total, viewer: apenas visualização')
+                
+                submit_button = st.form_submit_button('Criar Usuário')
+                
+                if submit_button:
+                    if not new_username or not new_password:
+                        st.error('Por favor, preencha todos os campos.')
+                    elif new_password != confirm_password:
+                        st.error('As senhas não coincidem.')
+                    elif len(new_password) < 6:
+                        st.error('A senha deve ter pelo menos 6 caracteres.')
+                    else:
+                        # Check if user already exists
+                        all_users = get_all_users()
+                        if new_username in all_users:
+                            st.error('Este nome de usuário já existe.')
+                        else:
+                            # Create new user
+                            users = get_all_users()
+                            users[new_username] = {
+                                'password_hash': hash_password(new_password),
+                                'role': user_role,
+                                'created_at': datetime.now().isoformat(),
+                                'last_login': None,
+                                'last_seen': None
+                            }
+                            save_all_users_to_file(users)
+                            
+                            st.success(f'Usuário "{new_username}" criado com sucesso como {user_role}!')
+                            logs_acesso.log_acesso(st.session_state['username'], 'USER_CREATED', 
+                                                 detalhes=f'Usuário {new_username} criado com perfil {user_role}')
+                            # Clear form by rerunning
+                            st.rerun()
 
 bases = carregar_bases()
 df_bal = bases['balanco']
@@ -979,7 +1271,15 @@ with aba_nf:
         
         # Ensure link columns contain only strings or None for proper LinkColumn rendering
         if 'Link_Consulta_NF' in df_display.columns:
-            df_display['Link_Consulta_NF'] = df_display['Link_Consulta_Nf'].apply(
+            df_display['Link_Consulta_NF'] = df_display['Link_Consulta_NF'].apply(
+                lambda x: str(x) if pd.notna(x) and str(x).strip() != '' else None
+            )
+        if 'Link_Origem_NF' in df_display.columns:
+            df_display['Link_Origem_NF'] = df_display['Link_Origem_NF'].apply(
+                lambda x: str(x) if pd.notna(x) and str(x).strip() != '' else None
+            )
+        if 'Link_Origem_NF' in df_display.columns:
+            df_display['Link_Origem_NF'] = df_display['Link_Origem_NF'].apply(
                 lambda x: str(x) if pd.notna(x) and str(x).strip() != '' else None
             )
         if 'Link_Origem_NF' in df_display.columns:
