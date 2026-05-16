@@ -1,0 +1,92 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs_acesso.csv
+*.log
+
+# Temporary files
+ocr_temp.pdf
+ocr_temp.png
+temp_*
+
+# Large data files that should not be in repo
+auditoria_condominio.xlsx
+backup.ipynb
+backup.txt
+
+# Generated dashboards (can be regenerated)
+*.html
+
+# PDF uploads directory (will be populated by users)
+ArquivosPDF/
+
+# Other data CSVs can be kept if small, but we exclude large ones
+# Keep the CSVs as they are moderate size
+# auditoria_*.csv are okay (<10MB each)
+
+# Secrets
+# (if you have a separate secrets file)

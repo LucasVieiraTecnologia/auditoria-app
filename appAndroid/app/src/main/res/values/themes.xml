@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.AuditoriaApp" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#2563eb</item>
+        <item name="colorPrimaryVariant">#1d4ed8</item>
+        <item name="colorOnPrimary">#ffffff</item>
+        <item name="colorSecondary">#0891b2</item>
+        <item name="colorSecondaryVariant">#0e7490</item>
+        <item name="colorOnSecondary">#ffffff</item>
+        <item name="android:statusBarColor">#2563eb</item>
+        <item name="android:navigationBarColor">#2563eb</item>
+    </style>
+</resources>
