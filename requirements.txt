@@ -5,3 +5,4 @@ PyMuPDF
 pytesseract
 Pillow
 openpyxl
+python-dotenv
