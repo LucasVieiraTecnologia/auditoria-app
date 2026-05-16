@@ -6,3 +6,4 @@ pytesseract
 Pillow
 openpyxl
 python-dotenv
+bcrypt
