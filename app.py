@@ -34,7 +34,7 @@ import rodar_auditoria_script as runner
 # ==========================================
 import logs_acesso
 
-st.set_page_config(page_title='Auditoria Inteligente de Condomínios', page_icon='🏢', layout='wide', initial_sidebar_state='expanded')
+st.set_page_config(page_title='Auditoria Inteligente de Condomínios', page_icon='🏢', layout='wide', initial_sidebar_state='collapsed')
 
 def hash_password(password: str) -> str:
     # Generate salt and hash password using bcrypt
@@ -369,6 +369,14 @@ html, body, [class*="css"] {font-family: 'Inter', 'Segoe UI', sans-serif;}
 .stTabs [data-baseweb=tab-list] {gap:6px; border-bottom:1px solid rgba(148,163,184,.28);}
 .stTabs [data-baseweb=tab] {border-radius:12px 12px 0 0; font-weight:700; padding:10px 16px;}
 @media (max-width: 900px) {.hero-stats {grid-template-columns:1fr 1fr;} .block-container {padding-left:1rem; padding-right:1rem;}}
+.sidebar-badge {display:inline-flex;align-items:center;gap:0.3rem;padding:0.15rem 0.5rem;border-radius:999px;font-size:0.68rem;font-weight:700;}
+.sidebar-badge-admin {background:rgba(37,99,235,0.15);color:#2563eb;border:1px solid rgba(37,99,235,0.25);}
+.sidebar-badge-viewer {background:rgba(16,185,129,0.15);color:#16a34a;border:1px solid rgba(16,185,129,0.25);}
+.sidebar-user-item {display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0.65rem;border-radius:10px;background:rgba(255,255,255,0.6);border:1px solid rgba(148,163,184,0.2);margin-bottom:0.35rem;}
+.sidebar-user-item-left {display:flex;align-items:center;gap:0.5rem;}
+.sidebar-user-item-name {font-weight:600;font-size:0.8rem;color:#0f172a;}
+.sidebar-user-item-time {font-size:0.65rem;color:#64748b;}
+.sidebar-pdf-item {font-size:0.8rem;color:#475569;padding:0.15rem 0;}
 </style>
 ''', unsafe_allow_html=True)
 
@@ -692,363 +700,15 @@ def filtros_to_html(meses_sel, tipos_sel, contas_sel, categorias_sel) -> str:
 st.markdown('''<div class="hero"><div class="hero-badge">Auditoria executiva • Controles financeiros • Evidências</div><div class="hero-title">Auditoria Inteligente de Condomínios</div><div class="hero-sub">Painel profissional para consolidar balancetes, movimentações, cobranças, fornecedores e alertas de divergência em uma visão única para tomada de decisão.</div></div>''', unsafe_allow_html=True)
 
 with st.sidebar:
-    st.markdown("""
-    <style>
-    div[data-testid="stSidebar"], div[data-testid="stSidebarContent"] {
-        background: #0f172a !important;
-    }
-    div[data-testid="stSidebar"] .stApp {
-        background: transparent !important;
-    }
-    div[data-testid="stSidebar"] * {
-        color: #e2e8f0 !important;
-    }
-    div[data-testid="stSidebar"] .st-b7,
-    div[data-testid="stSidebar"] .st-emotion-cache-1aej7m3 {
-        color: #e2e8f0 !important;
-    }
-    div[data-testid="stSidebar"] label,
-    div[data-testid="stSidebar"] .st-cb,
-    div[data-testid="stSidebar"] .st-c0 {
-        color: #94a3b8 !important;
-    }
-    .sidebar-section-title {
-        font-size: 0.72rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: #64748b;
-        margin-bottom: 0.5rem;
-        padding: 0 0.25rem;
-    }
-    .sidebar-card {
-        background: rgba(255,255,255,0.04);
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 14px;
-        padding: 0.75rem 1rem;
-        margin-bottom: 0.5rem;
-    }
-    .sidebar-user-avatar {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #2563eb, #1d4ed8);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 800;
-        font-size: 0.8rem;
-        color: #f8fafc !important;
-        flex-shrink: 0;
-    }
-    .sidebar-user-name {
-        font-weight: 700;
-        font-size: 0.85rem;
-        color: #f1f5f9;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .sidebar-user-role {
-        font-size: 0.7rem;
-        color: #94a3b8;
-        font-weight: 600;
-    }
-    .sidebar-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.3rem;
-        padding: 0.15rem 0.5rem;
-        border-radius: 999px;
-        font-size: 0.68rem;
-        font-weight: 700;
-    }
-    .sidebar-badge-online {
-        background: rgba(16,185,129,0.15);
-        color: #34d399 !important;
-        border: 1px solid rgba(16,185,129,0.25);
-    }
-    .sidebar-badge-offline {
-        background: rgba(107,114,128,0.15);
-        color: #9ca3af !important;
-        border: 1px solid rgba(107,114,128,0.25);
-    }
-    .sidebar-badge-admin {
-        background: rgba(37,99,235,0.15);
-        color: #60a5fa !important;
-        border: 1px solid rgba(37,99,235,0.25);
-    }
-    .sidebar-badge-viewer {
-        background: rgba(16,185,129,0.15);
-        color: #34d399 !important;
-        border: 1px solid rgba(16,185,129,0.25);
-    }
-    .sidebar-user-item {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0.5rem 0.65rem;
-        border-radius: 10px;
-        background: rgba(255,255,255,0.03);
-        border: 1px solid rgba(255,255,255,0.06);
-        margin-bottom: 0.35rem;
-    }
-    .sidebar-user-item-name {
-        font-weight: 600;
-        font-size: 0.8rem;
-        color: #e2e8f0;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .sidebar-user-item-time {
-        font-size: 0.65rem;
-        color: #64748b;
-    }
-    .sidebar-divider {
-        height: 1px;
-        background: linear-gradient(90deg, transparent, rgba(148,163,184,0.2), transparent);
-        margin: 0.75rem 0;
-    }
-    .sidebar-pdf-item {
-        font-size: 0.75rem;
-        color: #94a3b8;
-        padding: 0.2rem 0;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .sidebar-pdf-item::before {
-        content: '•';
-        color: #475569;
-        margin-right: 0.4rem;
-    }
-    .sidebar-log-area {
-        max-height: 180px;
-        overflow-y: auto;
-        font-size: 0.7rem;
-        line-height: 1.4;
-    }
-    .sidebar-log-area::-webkit-scrollbar { width: 4px; }
-    .sidebar-log-area::-webkit-scrollbar-track { background: transparent; }
-    .sidebar-log-area::-webkit-scrollbar-thumb {
-        background: rgba(148,163,184,0.2);
-        border-radius: 4px;
-    }
-    div[data-testid="stSidebar"] .stTabs [data-baseweb=tab] {
-        font-size: 0.7rem !important;
-        padding: 0.4rem 0.5rem !important;
-    }
-    div[data-testid="stSidebar"] .stTabs [data-baseweb=tab-list] { gap: 2px !important; }
-    div[data-testid="stSidebar"] .stTextInput input {
-        background: rgba(255,255,255,0.06) !important;
-        border: 1px solid rgba(255,255,255,0.1) !important;
-        border-radius: 10px !important;
-        color: #f1f5f9 !important;
-        font-size: 0.82rem !important;
-    }
-    div[data-testid="stSidebar"] .stTextInput input:focus {
-        border-color: #2563eb !important;
-        box-shadow: 0 0 0 3px rgba(37,99,235,0.15) !important;
-    }
-    div[data-testid="stSidebar"] .stSelectbox div[data-baseweb=select] > div {
-        background: rgba(255,255,255,0.06) !important;
-        border: 1px solid rgba(255,255,255,0.1) !important;
-        border-radius: 10px !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    # ── HEADER ──
-    st.markdown('<div style="display:flex;align-items:center;gap:0.6rem;padding:0.25rem 0 0.75rem 0;"><span style="font-size:1.4rem;">🏢</span><div><div style="font-weight:800;font-size:0.95rem;color:#f1f5f9;">Condomínio</div><div style="font-size:0.7rem;color:#94a3b8;font-weight:600;">Candelária</div></div></div>', unsafe_allow_html=True)
-    
-    # ── OPERAÇÃO (admin only) ──
-    if st.session_state.get('user_role') == 'admin':
-        st.markdown('<div class="sidebar-section-title">⚙️ Operação</div>', unsafe_allow_html=True)
-        uploads = st.file_uploader('Selecione os PDFs', type=['pdf'], accept_multiple_files=True, label_visibility='collapsed')
-        csave, crun = st.columns(2)
-        with csave:
-            if uploads and st.button('📥 Salvar', key='btn_save', use_container_width=True):
-                qtd = salvar_uploads(uploads)
-                st.toast(f'{qtd} arquivo(s) salvo(s).', icon='✅')
-        with crun:
-            btn_exec = st.button('▶ Executar', key='btn_run', type='primary', use_container_width=True)
-            if btn_exec:
-                if not listar_pdfs():
-                    st.warning('Nenhum PDF salvo em ArquivosPDF.')
-                else:
-                    with st.spinner('Processando...'):
-                        ok, codigo, log_texto = executar_runner_com_log()
-                        st.session_state['ultimo_log_auditoria'] = log_texto
-                        st.session_state['ultimo_status_auditoria'] = (ok, codigo)
-                    if ok:
-                        st.toast('Auditoria concluída com sucesso!', icon='✅')
-                    else:
-                        st.error(f'Falha na auditoria. Código: {codigo}')
-    else:
-        st.markdown('<div class="sidebar-section-title">📊 Visualização</div>', unsafe_allow_html=True)
-        st.markdown('<div style="font-size:0.8rem;color:#94a3b8;padding:0.5rem 0;">Modo leitura — apenas visualização dos dados.</div>', unsafe_allow_html=True)
-    
-    st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
-    
-    # ── PDFS PRONTOS ──
-    pdfs = listar_pdfs()
-    pdf_label = f'📂 PDFs prontos ({len(pdfs)})' if pdfs else '📂 PDFs prontos'
-    with st.expander(pdf_label, expanded=not pdfs):
-        if pdfs:
-            container = st.container(height=150, border=False)
-            with container:
-                for nome in pdfs:
-                    st.markdown(f'<div class="sidebar-pdf-item">{nome}</div>', unsafe_allow_html=True)
-        else:
-            st.caption('Nenhum PDF salvo.')
-    
-    # ── ÚLTIMO LOG ──
-    with st.expander('📋 Último log', expanded=False):
-        if 'ultimo_log_auditoria' in st.session_state:
-            st.markdown(f'<div class="sidebar-log-area"><pre style="color:#94a3b8;background:transparent;border:none;padding:0;font-size:0.7rem;">{st.session_state["ultimo_log_auditoria"]}</pre></div>', unsafe_allow_html=True)
-        else:
-            st.caption('Execute a auditoria para gerar logs.')
-    
-    st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
-    
-    # ── PERFIL ──
-    username = st.session_state.get('username', 'N/A')
-    user_role = st.session_state.get('user_role', 'viewer')
-    role_label = 'Admin' if user_role == 'admin' else 'Viewer'
-    avatar_letter = username[0].upper() if username and username != 'N/A' else '?'
-    
-    st.markdown(f'''
-    <div class="sidebar-card">
-        <div class="sidebar-user-row">
-            <div class="sidebar-user-info">
-                <div class="sidebar-user-avatar">{avatar_letter}</div>
-                <div>
-                    <div class="sidebar-user-name">{username}</div>
-                    <div class="sidebar-user-role">
-                        <span class="sidebar-badge sidebar-badge-{"admin" if user_role == "admin" else "viewer"}">{role_label}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    ''', unsafe_allow_html=True)
-    
-    col_logout, _ = st.columns([1, 1])
-    with col_logout:
+    username = st.session_state.get('username', '')
+    if username:
+        st.markdown(f'<div style="padding:0.5rem;text-align:center;font-size:0.8rem;color:#94a3b8;">👤 {username}</div>', unsafe_allow_html=True)
         if st.button('🚪 Sair', key='btn_logout', use_container_width=True):
             logs_acesso.log_acesso(username, 'LOGOUT', detalhes='Logout realizado')
             st.session_state['authenticated'] = False
             st.session_state['username'] = ''
             st.session_state['user_role'] = 'viewer'
             st.rerun()
-    
-    # ── ADMIN: LOGS, USUÁRIOS, CRIAR ──
-    if st.session_state.get('user_role') == 'admin':
-        st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
-        
-        tab1, tab2, tab3 = st.tabs(["📊 Logs", "👥 Online", "➕ Novo"])
-        
-        with tab1:
-            logs = logs_acesso.ler_logs()
-            if logs:
-                st.caption(f'{len(logs)} registro(s)')
-                df_logs = pd.DataFrame(logs)
-                st.dataframe(df_logs.tail(30), hide_index=True, use_container_width=True, height=200)
-                if st.button('🗑️ Limpar Logs', key='clear_logs', use_container_width=True):
-                    if hasattr(logs_acesso, 'LOG_FILE') and logs_acesso.LOG_FILE.exists():
-                        logs_acesso.LOG_FILE.unlink()
-                    logs_acesso.init_logs()
-                    st.toast('Logs limpos!', icon='🗑️')
-                    st.rerun()
-            else:
-                st.caption('Nenhum log registrado.')
-        
-        with tab2:
-            all_users = get_all_users()
-            online_users = [(u, info) for u, info in all_users.items() if is_user_online(u, minutes=5)]
-            offline_users = [(u, info) for u, info in all_users.items() if not is_user_online(u, minutes=5)]
-            
-            col_refresh, col_count = st.columns([1, 1])
-            with col_refresh:
-                if st.button('🔄 Atualizar', key='refresh_users', use_container_width=True):
-                    st.rerun()
-            with col_count:
-                st.markdown(f'<div style="text-align:right;font-size:0.75rem;color:#64748b;padding-top:0.2rem;">{len(online_users)} online</div>', unsafe_allow_html=True)
-            
-            if online_users:
-                for u, info in online_users:
-                    last_seen = info.get('last_seen')
-                    time_str = datetime.fromisoformat(last_seen).strftime("%H:%M") if last_seen else "—"
-                    role_badge = "Admin" if info.get('role') == 'admin' else "Viewer"
-                    bdg = "sidebar-badge-admin" if info.get('role') == 'admin' else "sidebar-badge-viewer"
-                    st.markdown(f'''
-                    <div class="sidebar-user-item">
-                        <div class="sidebar-user-item-left">
-                            <span style="width:8px;height:8px;border-radius:50%;background:#34d399;flex-shrink:0;"></span>
-                            <div>
-                                <div class="sidebar-user-item-name">{u}</div>
-                                <div class="sidebar-user-item-time">{time_str}</div>
-                            </div>
-                        </div>
-                        <span class="sidebar-badge {bdg}">{role_badge}</span>
-                    </div>
-                    ''', unsafe_allow_html=True)
-            else:
-                st.info('Ninguém online no momento.')
-            
-            if offline_users:
-                with st.expander(f"Offline ({len(offline_users)})"):
-                    for u, info in offline_users:
-                        last_seen = info.get('last_seen')
-                        time_str = datetime.fromisoformat(last_seen).strftime("%d/%m %H:%M") if last_seen else "Nunca"
-                        role_badge = "Admin" if info.get('role') == 'admin' else "Viewer"
-                        bdg = "sidebar-badge-admin" if info.get('role') == 'admin' else "sidebar-badge-viewer"
-                        st.markdown(f'''
-                        <div class="sidebar-user-item">
-                            <div class="sidebar-user-item-left">
-                                <span style="width:8px;height:8px;border-radius:50%;background:#6b7280;flex-shrink:0;"></span>
-                                <div>
-                                    <div class="sidebar-user-item-name">{u}</div>
-                                    <div class="sidebar-user-item-time">{time_str}</div>
-                                </div>
-                            </div>
-                            <span class="sidebar-badge {bdg}">{role_badge}</span>
-                        </div>
-                        ''', unsafe_allow_html=True)
-        
-        with tab3:
-            with st.form("create_user_form", border=False):
-                new_username = st.text_input('Usuário', placeholder='Nome')
-                new_password = st.text_input('Senha', type='password', placeholder='Senha')
-                confirm_password = st.text_input('Confirmar', type='password', placeholder='Confirme')
-                user_role = st.selectbox('Perfil', ['viewer', 'admin'])
-                
-                if st.form_submit_button('➕ Criar Usuário', use_container_width=True):
-                    if not new_username or not new_password:
-                        st.error('Preencha todos os campos.')
-                    elif new_password != confirm_password:
-                        st.error('Senhas não conferem.')
-                    elif len(new_password) < 6:
-                        st.error('Mínimo 6 caracteres.')
-                    else:
-                        all_users = get_all_users()
-                        if new_username in all_users:
-                            st.error('Usuário já existe.')
-                        else:
-                            users = get_all_users()
-                            users[new_username] = {
-                                'password_hash': hash_password(new_password),
-                                'role': user_role,
-                                'created_at': datetime.now().isoformat(),
-                                'last_login': None,
-                                'last_seen': None
-                            }
-                            save_all_users_to_file(users)
-                            st.toast(f'Usuário "{new_username}" criado!', icon='✅')
-                            logs_acesso.log_acesso(st.session_state['username'], 'USER_CREATED',
-                                                 detalhes=f'Usuário {new_username} criado com perfil {user_role}')
-                            st.rerun()
 
 bases = carregar_bases()
 df_bal = bases['balanco']
@@ -1126,7 +786,13 @@ if alertas_div:
     if len(alertas_div) > 5:
         st.caption(f'+ {len(alertas_div) - 5} outras divergências detectadas.')
 
-aba_exec, aba_ia, aba_balanco, aba_cat, aba_nf, aba_mov, aba_cob, aba_dash, aba_dl = st.tabs(['📈 Visão Executiva', '🤖 Assistente IA', '💰 Balanço', '🧩 Categorias', '🧾 Notas Fiscais', '🔎 Movimentações', '🏷️ Cobranças', '🌐 HTMLs', '📥 Downloads'])
+tab_labels = ['📈 Visão Executiva', '🤖 Assistente IA', '💰 Balanço', '🧩 Categorias', '🧾 Notas Fiscais', '🔎 Movimentações', '🏷️ Cobranças', '🌐 HTMLs', '📥 Downloads']
+is_admin_tab = st.session_state.get('user_role') == 'admin'
+if is_admin_tab:
+    tab_labels.append('🛠️ Admin')
+tabs = st.tabs(tab_labels)
+aba_exec, aba_ia, aba_balanco, aba_cat, aba_nf, aba_mov, aba_cob, aba_dash, aba_dl = tabs[:9]
+aba_admin = tabs[9] if is_admin_tab else None
 
 with aba_exec:
     r1c1, r1c2 = st.columns(2)
@@ -1437,23 +1103,15 @@ with aba_nf:
         colunas_nf = [c for c in ['Data', 'Fornecedor', 'Descricao', 'Valor_Real', 'Numero_NF', 'Chave_NF', 'Status_Consulta_NF', 'Link_Consulta_NF', 'Link_Origem_NF', 'Arquivo_NF_Baixado', 'Link_NF'] if c in df_nf_f.columns]
         df_display = preparar_exibicao(df_nf_f[colunas_nf]).copy()
         
-        # Ensure link columns contain only strings or None for proper LinkColumn rendering
-        if 'Link_Consulta_NF' in df_display.columns:
-            df_display['Link_Consulta_NF'] = df_display['Link_Consulta_NF'].apply(
-                lambda x: str(x) if pd.notna(x) and str(x).strip() != '' else None
-            )
-        if 'Link_Origem_NF' in df_display.columns:
-            df_display['Link_Origem_NF'] = df_display['Link_Origem_NF'].apply(
-                lambda x: str(x) if pd.notna(x) and str(x).strip() != '' else None
-            )
-        if 'Link_Origem_NF' in df_display.columns:
-            df_display['Link_Origem_NF'] = df_display['Link_Origem_NF'].apply(
-                lambda x: str(x) if pd.notna(x) and str(x).strip() != '' else None
-            )
-        if 'Link_Origem_NF' in df_display.columns:
-            df_display['Link_Origem_NF'] = df_display['Link_Origem_NF'].apply(
-                lambda x: str(x) if pd.notna(x) and str(x).strip() != '' else None
-            )
+        # Sanitize: replace inf/-inf with None (Arrow can't handle them)
+        df_display = df_display.replace([float('inf'), float('-inf')], None)
+        
+        # Ensure link columns contain only strings or None
+        for col in ['Link_Consulta_NF', 'Link_Origem_NF']:
+            if col in df_display.columns:
+                df_display[col] = df_display[col].apply(
+                    lambda x: str(x) if pd.notna(x) and str(x).strip() != '' else None
+                )
         
         try:
             st.dataframe(
@@ -1535,3 +1193,144 @@ with aba_dl:
                 with open(arq, 'rb') as f:
                     st.download_button(label=f'Baixar {arq.name}', data=f, file_name=arq.name, mime=mime, key=f'dl_{arq.name}', width='stretch')
                 st.caption(f'Tamanho: {round(arq.stat().st_size / 1024, 1)} KB')
+
+if aba_admin is not None:
+    with aba_admin:
+        st.markdown('<div class="section-title">⚙️ Operação</div>', unsafe_allow_html=True)
+        uploads = st.file_uploader('Selecione os PDFs', type=['pdf'], accept_multiple_files=True, label_visibility='collapsed')
+        csave, crun = st.columns(2)
+        with csave:
+            if uploads and st.button('📥 Salvar', key='btn_save', use_container_width=True):
+                qtd = salvar_uploads(uploads)
+                st.toast(f'{qtd} arquivo(s) salvo(s).', icon='✅')
+        with crun:
+            btn_exec = st.button('▶ Executar', key='btn_run', type='primary', use_container_width=True)
+            if btn_exec:
+                if not listar_pdfs():
+                    st.warning('Nenhum PDF salvo em ArquivosPDF.')
+                else:
+                    with st.spinner('Processando...'):
+                        ok, codigo, log_texto = executar_runner_com_log()
+                        st.session_state['ultimo_log_auditoria'] = log_texto
+                        st.session_state['ultimo_status_auditoria'] = (ok, codigo)
+                    if ok:
+                        st.toast('Auditoria concluída com sucesso!', icon='✅')
+                    else:
+                        st.error(f'Falha na auditoria. Código: {codigo}')
+
+        pdfs = listar_pdfs()
+        if pdfs:
+            with st.expander(f'📂 PDFs prontos ({len(pdfs)})', expanded=False):
+                for nome in pdfs:
+                    st.markdown(f'<div class="sidebar-pdf-item">{nome}</div>', unsafe_allow_html=True)
+
+        with st.expander('📋 Último log', expanded=False):
+            if 'ultimo_log_auditoria' in st.session_state:
+                st.code(st.session_state['ultimo_log_auditoria'], language='')
+            else:
+                st.caption('Execute a auditoria para gerar logs.')
+
+        st.divider()
+
+        tab1, tab2, tab3 = st.tabs(["📊 Logs", "👥 Online", "➕ Novo"])
+
+        with tab1:
+            logs = logs_acesso.ler_logs()
+            if logs:
+                st.caption(f'{len(logs)} registro(s)')
+                df_logs = pd.DataFrame(logs)
+                st.dataframe(df_logs.tail(30), hide_index=True, use_container_width=True, height=200)
+                if st.button('🗑️ Limpar Logs', key='clear_logs', use_container_width=True):
+                    if hasattr(logs_acesso, 'LOG_FILE') and logs_acesso.LOG_FILE.exists():
+                        logs_acesso.LOG_FILE.unlink()
+                    logs_acesso.init_logs()
+                    st.toast('Logs limpos!', icon='🗑️')
+                    st.rerun()
+            else:
+                st.caption('Nenhum log registrado.')
+
+        with tab2:
+            all_users = get_all_users()
+            online_users = [(u, info) for u, info in all_users.items() if is_user_online(u, minutes=5)]
+            offline_users = [(u, info) for u, info in all_users.items() if not is_user_online(u, minutes=5)]
+
+            col_refresh, col_count = st.columns([1, 1])
+            with col_refresh:
+                if st.button('🔄 Atualizar', key='refresh_users', use_container_width=True):
+                    st.rerun()
+            with col_count:
+                st.markdown(f'<div style="text-align:right;font-size:0.75rem;color:#64748b;padding-top:0.2rem;">{len(online_users)} online</div>', unsafe_allow_html=True)
+
+            if online_users:
+                for u, info in online_users:
+                    last_seen = info.get('last_seen')
+                    time_str = datetime.fromisoformat(last_seen).strftime("%H:%M") if last_seen else "—"
+                    role_badge = "Admin" if info.get('role') == 'admin' else "Viewer"
+                    bdg = "sidebar-badge-admin" if info.get('role') == 'admin' else "sidebar-badge-viewer"
+                    st.markdown(f'''
+                    <div class="sidebar-user-item">
+                        <div class="sidebar-user-item-left">
+                            <span style="width:8px;height:8px;border-radius:50%;background:#34d399;flex-shrink:0;"></span>
+                            <div>
+                                <div class="sidebar-user-item-name">{u}</div>
+                                <div class="sidebar-user-item-time">{time_str}</div>
+                            </div>
+                        </div>
+                        <span class="sidebar-badge {bdg}">{role_badge}</span>
+                    </div>
+                    ''', unsafe_allow_html=True)
+            else:
+                st.info('Ninguém online no momento.')
+
+            if offline_users:
+                with st.expander(f"Offline ({len(offline_users)})"):
+                    for u, info in offline_users:
+                        last_seen = info.get('last_seen')
+                        time_str = datetime.fromisoformat(last_seen).strftime("%d/%m %H:%M") if last_seen else "Nunca"
+                        role_badge = "Admin" if info.get('role') == 'admin' else "Viewer"
+                        bdg = "sidebar-badge-admin" if info.get('role') == 'admin' else "sidebar-badge-viewer"
+                        st.markdown(f'''
+                        <div class="sidebar-user-item">
+                            <div class="sidebar-user-item-left">
+                                <span style="width:8px;height:8px;border-radius:50%;background:#6b7280;flex-shrink:0;"></span>
+                                <div>
+                                    <div class="sidebar-user-item-name">{u}</div>
+                                    <div class="sidebar-user-item-time">{time_str}</div>
+                                </div>
+                            </div>
+                            <span class="sidebar-badge {bdg}">{role_badge}</span>
+                        </div>
+                        ''', unsafe_allow_html=True)
+
+        with tab3:
+            with st.form("create_user_form", border=False):
+                new_username = st.text_input('Usuário', placeholder='Nome')
+                new_password = st.text_input('Senha', type='password', placeholder='Senha')
+                confirm_password = st.text_input('Confirmar', type='password', placeholder='Confirme')
+                user_role = st.selectbox('Perfil', ['viewer', 'admin'])
+
+                if st.form_submit_button('➕ Criar Usuário', use_container_width=True):
+                    if not new_username or not new_password:
+                        st.error('Preencha todos os campos.')
+                    elif new_password != confirm_password:
+                        st.error('Senhas não conferem.')
+                    elif len(new_password) < 6:
+                        st.error('Mínimo 6 caracteres.')
+                    else:
+                        all_users = get_all_users()
+                        if new_username in all_users:
+                            st.error('Usuário já existe.')
+                        else:
+                            users = get_all_users()
+                            users[new_username] = {
+                                'password_hash': hash_password(new_password),
+                                'role': user_role,
+                                'created_at': datetime.now().isoformat(),
+                                'last_login': None,
+                                'last_seen': None
+                            }
+                            save_all_users_to_file(users)
+                            st.toast(f'Usuário "{new_username}" criado!', icon='✅')
+                            logs_acesso.log_acesso(st.session_state['username'], 'USER_CREATED',
+                                                 detalhes=f'Usuário {new_username} criado com perfil {user_role}')
+                            st.rerun()
