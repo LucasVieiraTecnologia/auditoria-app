@@ -42,68 +42,29 @@ def hash_password(password: str) -> str:
     hashed = bcrypt.hashpw(password.encode(), salt)
     return hashed.decode('utf-8')
 
+def _get_credential(key):
+    try:
+        if key in st.secrets:
+            return st.secrets[key]
+    except Exception:
+        pass
+    return os.getenv(key, '')
+
 def get_users():
     """Retorna dicionário de usuários do arquivo users.json (apenas username:password_hash para autenticação)"""
-    users_file = Path('users.json')
-    
-    # If users.json doesn't exist, create it from .env
-    if not users_file.exists():
-        users = {}
-        # Usuário principal
-        user_env = os.getenv('APP_USERNAME', 'Lucas')
-        pass_env = os.getenv('APP_PASSWORD', 'Lucas@3267')
-        users[user_env] = hash_password(pass_env)
-        
-        # Usuários adicionais (APP_USERS=user1:pass1,user2:pass2)
-        users_str = os.getenv('APP_USERS', '')
-        if users_str:
-            for pair in users_str.split(','):
-                if ':' in pair:
-                    u, p = pair.split(':', 1)
-                    users[u.strip()] = hash_password(p.strip())
-        
-        # Save to users.json
-        save_users_to_file(users)
-        return users
-    
-    # Load from users.json
-    try:
-        with open(users_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            users_data = data.get('users', {})
-            
-            # Convert to the expected format (username: password_hash)
-            users = {}
-            for username, user_info in users_data.items():
-                users[username] = user_info.get('password_hash', '')
-            
-            return users
-    except Exception as e:
-        # Fallback to .env if there's an error
-        users = {}
-        user_env = os.getenv('APP_USERNAME', 'Lucas')
-        pass_env = os.getenv('APP_PASSWORD', 'Lucas@3267')
-        users[user_env] = hash_password(pass_env)
-        
-        users_str = os.getenv('APP_USERS', '')
-        if users_str:
-            for pair in users_str.split(','):
-                if ':' in pair:
-                    u, p = pair.split(':', 1)
-                    users[u.strip()] = hash_password(p.strip())
-        
-        return users
+    all_users = get_all_users()
+    return {u: info.get('password_hash', '') for u, info in all_users.items()}
 
 def get_all_users():
     """Retorna dicionário completo de usuários do arquivo users.json"""
     users_file = Path('users.json')
     
-    # If users.json doesn't exist, create it from .env
+    user_env = _get_credential('APP_USERNAME')
+    pass_env = _get_credential('APP_PASSWORD')
+    users_str = _get_credential('APP_USERS')
+    
     if not users_file.exists():
         users = {}
-        # Usuário principal
-        user_env = os.getenv('APP_USERNAME', 'Lucas')
-        pass_env = os.getenv('APP_PASSWORD', 'Lucas@3267')
         users[user_env] = {
             'password_hash': hash_password(pass_env),
             'role': 'admin',
@@ -112,8 +73,6 @@ def get_all_users():
             'last_seen': None
         }
         
-        # Usuários adicionais (APP_USERS=user1:pass1,user2:pass2)
-        users_str = os.getenv('APP_USERS', '')
         if users_str:
             for pair in users_str.split(','):
                 if ':' in pair:
@@ -126,20 +85,15 @@ def get_all_users():
                         'last_seen': None
                     }
         
-        # Save to users.json
         save_all_users_to_file(users)
         return users
     
-    # Load from users.json
     try:
         with open(users_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
             return data.get('users', {})
-    except Exception as e:
-        # Fallback to basic users if there's an error
+    except Exception:
         users = {}
-        user_env = os.getenv('APP_USERNAME', 'Lucas')
-        pass_env = os.getenv('APP_PASSWORD', 'Lucas@3267')
         users[user_env] = {
             'password_hash': hash_password(pass_env),
             'role': 'admin',
@@ -148,7 +102,6 @@ def get_all_users():
             'last_seen': None
         }
         
-        users_str = os.getenv('APP_USERS', '')
         if users_str:
             for pair in users_str.split(','):
                 if ':' in pair:
@@ -328,6 +281,11 @@ def login_screen():
     }
     </style>
     """, unsafe_allow_html=True)
+    
+    users_check = get_all_users()
+    if not users_check:
+        st.error('Nenhum usuário configurado. Defina APP_USERNAME e APP_PASSWORD nas variáveis de ambiente ou secrets do Streamlit.')
+        st.stop()
     
     st.markdown('<div class="login-logo">🏢</div>', unsafe_allow_html=True)
     st.markdown('<div class="login-title">Condomínio Candelária</div>', unsafe_allow_html=True)

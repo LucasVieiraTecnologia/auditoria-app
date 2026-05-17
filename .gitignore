@@ -90,3 +90,6 @@ ArquivosPDF/
 
 # Secrets
 # (if you have a separate secrets file)
+
+# User database (auto-generated from secrets/env)
+users.json
