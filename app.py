@@ -1474,57 +1474,81 @@ with aba_nf:
             st.plotly_chart(fig, width='stretch')
 
         busca = st.text_input('🔍 Buscar nota/despesa', placeholder='Filtrar por fornecedor, descrição...')
-        filtro = df_nf_f if not busca else df_nf_f[df_nf_f.apply(
-            lambda r: busca.lower() in str(r.get('Data', '')).lower() or
-                      busca.lower() in str(r.get('Fornecedor', '')).lower() or
-                      busca.lower() in str(r.get('Descricao', '')).lower(), axis=1)]
-        
-        st.caption(f'{len(filtro)} itens')
-        
-        st.divider()
-        st.markdown('<div class="section-title">Tabela completa</div>', unsafe_allow_html=True)
-        
         ordem_nf = st.selectbox('Ordenar por', ['Valor (maior → menor)', 'Valor (menor → maior)', 'Data (recente → antiga)', 'Data (antiga → recente)', 'Fornecedor (A → Z)'], key='ordem_nf')
+
         nf_table = df_nf_f.copy()
-        nf_table = nf_table if not busca else nf_table[nf_table.apply(
-            lambda r: busca.lower() in str(r.get('Data', '')).lower() or
-                      busca.lower() in str(r.get('Fornecedor', '')).lower() or
-                      busca.lower() in str(r.get('Descricao', '')).lower(), axis=1)]
+        if busca:
+            nf_table = nf_table[nf_table.apply(
+                lambda r: busca.lower() in str(r.get('Data', '')).lower() or
+                          busca.lower() in str(r.get('Fornecedor', '')).lower() or
+                          busca.lower() in str(r.get('Descricao', '')).lower(), axis=1)]
         sort_map = {'Valor (maior → menor)': ('Valor_Real', False), 'Valor (menor → maior)': ('Valor_Real', True), 'Data (recente → antiga)': ('Data', False), 'Data (antiga → recente)': ('Data', True), 'Fornecedor (A → Z)': ('Fornecedor', True)}
         if ordem_nf in sort_map and sort_map[ordem_nf][0] in nf_table.columns:
             nf_table = nf_table.sort_values(sort_map[ordem_nf][0], ascending=sort_map[ordem_nf][1])
-        nf_table_total = nf_table.copy()
-        if 'nf_limit' not in st.session_state:
-            st.session_state['nf_limit'] = 50
-        nf_table = nf_table.head(st.session_state['nf_limit']).reset_index(drop=True)
-        
-        hdr = st.columns([0.5, 1.3, 2.2, 1, 2])
-        hdr[0].markdown('**🔍**')
-        hdr[1].markdown('**Data**')
-        hdr[2].markdown('**Fornecedor**')
-        hdr[3].markdown('**Valor**')
-        hdr[4].markdown('**Descrição**')
-        st.markdown('---')
-        
-        for idx in range(len(nf_table)):
-            r = nf_table.iloc[idx]
-            c = st.columns([0.5, 1.3, 2.2, 1, 2])
-            btn_key = f'nf_exp_{idx}'
-            if c[0].button('🔍', key=btn_key, help='Ver detalhes'):
-                st.session_state['popup_row'] = nf_table.iloc[idx].to_dict()
-                st.session_state['popup_tem_img'] = bool(nf_table.iloc[idx].get('Link_NF')) and Path(str(nf_table.iloc[idx].get('Link_NF', ''))).exists()
-                detail_dialog()
-            c[1].write(str(r.get('Data', '') or ''))
-            c[2].write(html.escape(str(r.get('Fornecedor', '') or ''))[:45])
-            c[3].write(moeda_br(r.get('Valor_Real', 0)))
-            c[4].write(html.escape(str(r.get('Descricao', '') or ''))[:45])
-        
-        if len(nf_table_total) > st.session_state['nf_limit']:
-            rest = len(nf_table_total) - st.session_state['nf_limit']
-            step = min(50, rest)
-            if st.button(f'Mostrar mais {step} itens ({rest} restantes)', key='nf_mostrar_mais', use_container_width=True):
-                st.session_state['nf_limit'] += step
-                st.rerun()
+
+        st.caption(f'{len(nf_table)} itens')
+        st.divider()
+        st.markdown('<div class="section-title">Tabela completa</div>', unsafe_allow_html=True)
+
+        cols_nf_display = [c for c in ['Data', 'Fornecedor', 'Descricao', 'Valor_Real', 'Numero_NF', 'Status_Consulta_NF', 'Categoria'] if c in nf_table.columns]
+        page_size = 25
+        total_items = len(nf_table)
+        total_pages = max(1, (total_items + page_size - 1) // page_size)
+        page_key = 'nf_page'
+        if page_key not in st.session_state:
+            st.session_state[page_key] = 1
+        page = st.session_state[page_key]
+        if page > total_pages:
+            st.session_state[page_key] = total_pages
+            page = total_pages
+
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_df = nf_table.iloc[start:end][cols_nf_display].reset_index(drop=True)
+
+        sel = st.dataframe(
+            page_df,
+            width='stretch',
+            hide_index=True,
+            use_container_width=True,
+            column_config={
+                'Valor_Real': st.column_config.NumberColumn('Valor', format='R$ %.2f'),
+                'Data': st.column_config.TextColumn('Data'),
+                'Fornecedor': st.column_config.TextColumn('Fornecedor', width='medium'),
+                'Descricao': st.column_config.TextColumn('Descrição', width='large'),
+            },
+            key='nf_dataframe',
+            on_select='rerun',
+            selection_mode='single-row',
+        )
+
+        if sel and sel.selection and sel.selection.rows:
+            idx = sel.selection.rows[0]
+            real_idx = start + idx
+            row = nf_table.iloc[real_idx].to_dict()
+            st.session_state['popup_row'] = row
+            st.session_state['popup_tem_img'] = bool(row.get('Link_NF')) and Path(str(row.get('Link_NF', ''))).exists()
+            detail_dialog()
+
+        if total_pages > 1:
+            paginator = st.columns([1, 2, 1, 2, 1])
+            with paginator[0]:
+                if st.button('◀ Anterior', key='nf_prev', disabled=(page <= 1), use_container_width=True):
+                    st.session_state[page_key] = max(1, page - 1)
+                    st.rerun()
+            with paginator[1]:
+                st.markdown(f'<div style="text-align:center;padding:0.4rem;">Página {page} de {total_pages}</div>', unsafe_allow_html=True)
+            with paginator[2]:
+                jumper = st.number_input('Ir para', min_value=1, max_value=total_pages, value=page, label_visibility='collapsed', key='nf_jump')
+                if jumper != page:
+                    st.session_state[page_key] = jumper
+                    st.rerun()
+            with paginator[3]:
+                st.markdown(f'<div style="text-align:center;padding:0.4rem;">{total_items} itens</div>', unsafe_allow_html=True)
+            with paginator[4]:
+                if st.button('Próximo ▶', key='nf_next', disabled=(page >= total_pages), use_container_width=True):
+                    st.session_state[page_key] = min(total_pages, page + 1)
+                    st.rerun()
 
 with aba_mov:
     st.markdown('<div class="section-title">Movimentações Analíticas</div>', unsafe_allow_html=True)
@@ -1543,54 +1567,81 @@ with aba_mov:
             formatar_fig(fig, height=260 * ((n_contas - 1) // 3 + 2), moeda=True)
             st.plotly_chart(fig, width='stretch')
         
+        detalhes_filter = df_mov_f.copy()
         if {'Categoria'}.issubset(df_mov_f.columns):
             cats = ['Todos'] + sorted(df_mov_f['Categoria'].dropna().astype(str).unique().tolist())
             cat_sel = st.selectbox('Detalhar categoria/despesa (ex.: obra, manutenção, serviços)', cats)
-            detalhes = df_mov_f if cat_sel == 'Todos' else df_mov_f[df_mov_f['Categoria'].astype(str) == cat_sel]
-        else:
-            detalhes = df_mov_f.copy()
+            if cat_sel != 'Todos':
+                detalhes_filter = detalhes_filter[detalhes_filter['Categoria'].astype(str) == cat_sel]
         
         ordem_mov = st.selectbox('Ordenar por', ['Valor (maior → menor)', 'Valor (menor → maior)', 'Data (recente → antiga)', 'Data (antiga → recente)', 'Fornecedor (A → Z)'], key='ordem_mov')
         busca_mov_tab = st.text_input('Filtrar na tabela', placeholder='Fornecedor, descrição...', key='busca_mov_tab')
         if busca_mov_tab:
-            detalhes = detalhes[detalhes.apply(lambda r: busca_mov_tab.lower() in str(r.get('Data', '')).lower() or busca_mov_tab.lower() in str(r.get('Fornecedor', '')).lower() or busca_mov_tab.lower() in str(r.get('Descricao', '')).lower(), axis=1)]
+            detalhes_filter = detalhes_filter[detalhes_filter.apply(lambda r: busca_mov_tab.lower() in str(r.get('Data', '')).lower() or busca_mov_tab.lower() in str(r.get('Fornecedor', '')).lower() or busca_mov_tab.lower() in str(r.get('Descricao', '')).lower(), axis=1)]
         sort_map = {'Valor (maior → menor)': ('Valor_Real', False), 'Valor (menor → maior)': ('Valor_Real', True), 'Data (recente → antiga)': ('Data', False), 'Data (antiga → recente)': ('Data', True), 'Fornecedor (A → Z)': ('Fornecedor', True)}
-        if ordem_mov in sort_map and sort_map[ordem_mov][0] in detalhes.columns:
-            detalhes = detalhes.sort_values(sort_map[ordem_mov][0], ascending=sort_map[ordem_mov][1])
-        detalhes_total = detalhes.copy()
-        if 'mov_limit' not in st.session_state:
-            st.session_state['mov_limit'] = 50
-        detalhes = detalhes.head(st.session_state['mov_limit']).reset_index(drop=True)
-        
-        cols_mov = [c for c in ['Data', 'Fornecedor', 'Descricao', 'Valor_Real', 'Categoria', 'Conta', 'Tipo_Movimento'] if c in df_mov_f.columns]
-        
-        hdr = st.columns([0.5, 1.3, 2.2, 1, 2])
-        hdr[0].markdown('**🔍**')
-        hdr[1].markdown('**Data**')
-        hdr[2].markdown('**Fornecedor**')
-        hdr[3].markdown('**Valor**')
-        hdr[4].markdown('**Descrição**')
-        st.markdown('---')
-        
-        for idx in range(len(detalhes)):
-            r = detalhes.iloc[idx]
-            c = st.columns([0.5, 1.3, 2.2, 1, 2])
-            btn_key = f'mov_exp_{idx}'
-            if c[0].button('🔍', key=btn_key, help='Ver detalhes'):
-                st.session_state['popup_row'] = detalhes.iloc[idx].to_dict()
-                st.session_state['popup_tem_img'] = bool(detalhes.iloc[idx].get('Link_NF')) and Path(str(detalhes.iloc[idx].get('Link_NF', ''))).exists()
-                detail_dialog()
-            c[1].write(str(r.get('Data', '') or ''))
-            c[2].write(html.escape(str(r.get('Fornecedor', '') or ''))[:45])
-            c[3].write(moeda_br(r.get('Valor_Real', 0)))
-            c[4].write(html.escape(str(r.get('Descricao', '') or ''))[:45])
-        
-        if len(detalhes_total) > st.session_state['mov_limit']:
-            rest = len(detalhes_total) - st.session_state['mov_limit']
-            step = min(50, rest)
-            if st.button(f'Mostrar mais {step} itens ({rest} restantes)', key='mov_mostrar_mais', use_container_width=True):
-                st.session_state['mov_limit'] += step
-                st.rerun()
+        if ordem_mov in sort_map and sort_map[ordem_mov][0] in detalhes_filter.columns:
+            detalhes_filter = detalhes_filter.sort_values(sort_map[ordem_mov][0], ascending=sort_map[ordem_mov][1])
+
+        cols_mov_display = [c for c in ['Data', 'Fornecedor', 'Descricao', 'Valor_Real', 'Categoria', 'Conta', 'Tipo_Movimento'] if c in detalhes_filter.columns]
+        page_size = 25
+        total_items = len(detalhes_filter)
+        total_pages = max(1, (total_items + page_size - 1) // page_size)
+        page_key = 'mov_page'
+        if page_key not in st.session_state:
+            st.session_state[page_key] = 1
+        page = st.session_state[page_key]
+        if page > total_pages:
+            st.session_state[page_key] = total_pages
+            page = total_pages
+
+        st.caption(f'{total_items} itens')
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_df = detalhes_filter.iloc[start:end][cols_mov_display].reset_index(drop=True)
+
+        sel = st.dataframe(
+            page_df,
+            width='stretch',
+            hide_index=True,
+            use_container_width=True,
+            column_config={
+                'Valor_Real': st.column_config.NumberColumn('Valor', format='R$ %.2f'),
+                'Data': st.column_config.TextColumn('Data'),
+                'Fornecedor': st.column_config.TextColumn('Fornecedor', width='medium'),
+                'Descricao': st.column_config.TextColumn('Descrição', width='large'),
+            },
+            key='mov_dataframe',
+            on_select='rerun',
+            selection_mode='single-row',
+        )
+
+        if sel and sel.selection and sel.selection.rows:
+            idx = sel.selection.rows[0]
+            real_idx = start + idx
+            row = detalhes_filter.iloc[real_idx].to_dict()
+            st.session_state['popup_row'] = row
+            st.session_state['popup_tem_img'] = bool(row.get('Link_NF')) and Path(str(row.get('Link_NF', ''))).exists()
+            detail_dialog()
+
+        if total_pages > 1:
+            paginator = st.columns([1, 2, 1, 2, 1])
+            with paginator[0]:
+                if st.button('◀ Anterior', key='mov_prev', disabled=(page <= 1), use_container_width=True):
+                    st.session_state[page_key] = max(1, page - 1)
+                    st.rerun()
+            with paginator[1]:
+                st.markdown(f'<div style="text-align:center;padding:0.4rem;">Página {page} de {total_pages}</div>', unsafe_allow_html=True)
+            with paginator[2]:
+                jumper = st.number_input('Ir para', min_value=1, max_value=total_pages, value=page, label_visibility='collapsed', key='mov_jump')
+                if jumper != page:
+                    st.session_state[page_key] = jumper
+                    st.rerun()
+            with paginator[3]:
+                st.markdown(f'<div style="text-align:center;padding:0.4rem;">{total_items} itens</div>', unsafe_allow_html=True)
+            with paginator[4]:
+                if st.button('Próximo ▶', key='mov_next', disabled=(page >= total_pages), use_container_width=True):
+                    st.session_state[page_key] = min(total_pages, page + 1)
+                    st.rerun()
 
 with aba_cob:
     st.markdown('<div class="section-title">Composição das Cobranças</div>', unsafe_allow_html=True)
