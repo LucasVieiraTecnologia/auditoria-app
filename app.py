@@ -710,6 +710,151 @@ with st.sidebar:
             st.session_state['user_role'] = 'viewer'
             st.rerun()
 
+is_admin = st.session_state.get('user_role') == 'admin'
+if is_admin:
+    with st.expander('🛠️ Administração', expanded=False):
+        st.markdown('<div class="section-title">⚙️ Operação</div>', unsafe_allow_html=True)
+        uploads = st.file_uploader('Selecione os PDFs', type=['pdf'], accept_multiple_files=True, label_visibility='collapsed')
+        csave, crun = st.columns(2)
+        with csave:
+            if uploads and st.button('📥 Salvar', key='btn_save', use_container_width=True):
+                qtd = salvar_uploads(uploads)
+                st.toast(f'{qtd} arquivo(s) salvo(s).', icon='✅')
+        with crun:
+            btn_exec = st.button('▶ Executar', key='btn_run', type='primary', use_container_width=True)
+            if btn_exec:
+                if not listar_pdfs():
+                    st.warning('Nenhum PDF salvo em ArquivosPDF.')
+                else:
+                    with st.spinner('Processando...'):
+                        ok, codigo, log_texto = executar_runner_com_log()
+                        st.session_state['ultimo_log_auditoria'] = log_texto
+                        st.session_state['ultimo_status_auditoria'] = (ok, codigo)
+                    if ok:
+                        st.toast('Auditoria concluída com sucesso!', icon='✅')
+                    else:
+                        st.error(f'Falha na auditoria. Código: {codigo}')
+
+        pdfs = listar_pdfs()
+        if pdfs:
+            with st.expander(f'📂 PDFs prontos ({len(pdfs)})', expanded=False):
+                for nome in pdfs:
+                    st.markdown(f'<div class="sidebar-pdf-item">{nome}</div>', unsafe_allow_html=True)
+
+        with st.expander('📋 Último log', expanded=False):
+            if 'ultimo_log_auditoria' in st.session_state:
+                st.code(st.session_state['ultimo_log_auditoria'], language='')
+            else:
+                st.caption('Execute a auditoria para gerar logs.')
+
+        st.divider()
+
+        tab1, tab2, tab3 = st.tabs(["📊 Logs", "👥 Online", "➕ Novo"])
+
+        with tab1:
+            logs = logs_acesso.ler_logs()
+            if logs:
+                st.caption(f'{len(logs)} registro(s)')
+                df_logs = pd.DataFrame(logs)
+                try:
+                    st.dataframe(df_logs.tail(30), hide_index=True, use_container_width=True, height=200)
+                except Exception:
+                    st.table(df_logs.tail(30).astype(str))
+                if st.button('🗑️ Limpar Logs', key='clear_logs', use_container_width=True):
+                    if hasattr(logs_acesso, 'LOG_FILE') and logs_acesso.LOG_FILE.exists():
+                        logs_acesso.LOG_FILE.unlink()
+                    logs_acesso.init_logs()
+                    st.toast('Logs limpos!', icon='🗑️')
+                    st.rerun()
+            else:
+                st.caption('Nenhum log registrado.')
+
+        with tab2:
+            all_users = get_all_users()
+            online_users = [(u, info) for u, info in all_users.items() if is_user_online(u, minutes=5)]
+            offline_users = [(u, info) for u, info in all_users.items() if not is_user_online(u, minutes=5)]
+
+            col_refresh, col_count = st.columns([1, 1])
+            with col_refresh:
+                if st.button('🔄 Atualizar', key='refresh_users', use_container_width=True):
+                    st.rerun()
+            with col_count:
+                st.markdown(f'<div style="text-align:right;font-size:0.75rem;color:#64748b;padding-top:0.2rem;">{len(online_users)} online</div>', unsafe_allow_html=True)
+
+            if online_users:
+                for u, info in online_users:
+                    last_seen = info.get('last_seen')
+                    time_str = datetime.fromisoformat(last_seen).strftime("%H:%M") if last_seen else "—"
+                    role_badge = "Admin" if info.get('role') == 'admin' else "Viewer"
+                    bdg = "sidebar-badge-admin" if info.get('role') == 'admin' else "sidebar-badge-viewer"
+                    st.markdown(f'''
+                    <div class="sidebar-user-item">
+                        <div class="sidebar-user-item-left">
+                            <span style="width:8px;height:8px;border-radius:50%;background:#34d399;flex-shrink:0;"></span>
+                            <div>
+                                <div class="sidebar-user-item-name">{u}</div>
+                                <div class="sidebar-user-item-time">{time_str}</div>
+                            </div>
+                        </div>
+                        <span class="sidebar-badge {bdg}">{role_badge}</span>
+                    </div>
+                    ''', unsafe_allow_html=True)
+            else:
+                st.info('Ninguém online no momento.')
+
+            if offline_users:
+                with st.expander(f"Offline ({len(offline_users)})"):
+                    for u, info in offline_users:
+                        last_seen = info.get('last_seen')
+                        time_str = datetime.fromisoformat(last_seen).strftime("%d/%m %H:%M") if last_seen else "Nunca"
+                        role_badge = "Admin" if info.get('role') == 'admin' else "Viewer"
+                        bdg = "sidebar-badge-admin" if info.get('role') == 'admin' else "sidebar-badge-viewer"
+                        st.markdown(f'''
+                        <div class="sidebar-user-item">
+                            <div class="sidebar-user-item-left">
+                                <span style="width:8px;height:8px;border-radius:50%;background:#6b7280;flex-shrink:0;"></span>
+                                <div>
+                                    <div class="sidebar-user-item-name">{u}</div>
+                                    <div class="sidebar-user-item-time">{time_str}</div>
+                                </div>
+                            </div>
+                            <span class="sidebar-badge {bdg}">{role_badge}</span>
+                        </div>
+                        ''', unsafe_allow_html=True)
+
+        with tab3:
+            with st.form("create_user_form", border=False):
+                new_username = st.text_input('Usuário', placeholder='Nome')
+                new_password = st.text_input('Senha', type='password', placeholder='Senha')
+                confirm_password = st.text_input('Confirmar', type='password', placeholder='Confirme')
+                user_role = st.selectbox('Perfil', ['viewer', 'admin'])
+
+                if st.form_submit_button('➕ Criar Usuário', use_container_width=True):
+                    if not new_username or not new_password:
+                        st.error('Preencha todos os campos.')
+                    elif new_password != confirm_password:
+                        st.error('Senhas não conferem.')
+                    elif len(new_password) < 6:
+                        st.error('Mínimo 6 caracteres.')
+                    else:
+                        all_users = get_all_users()
+                        if new_username in all_users:
+                            st.error('Usuário já existe.')
+                        else:
+                            users = get_all_users()
+                            users[new_username] = {
+                                'password_hash': hash_password(new_password),
+                                'role': user_role,
+                                'created_at': datetime.now().isoformat(),
+                                'last_login': None,
+                                'last_seen': None
+                            }
+                            save_all_users_to_file(users)
+                            st.toast(f'Usuário "{new_username}" criado!', icon='✅')
+                            logs_acesso.log_acesso(st.session_state['username'], 'USER_CREATED',
+                                                 detalhes=f'Usuário {new_username} criado com perfil {user_role}')
+                            st.rerun()
+
 bases = carregar_bases()
 df_bal = bases['balanco']
 df_cat = bases['categorias']
@@ -787,12 +932,8 @@ if alertas_div:
         st.caption(f'+ {len(alertas_div) - 5} outras divergências detectadas.')
 
 tab_labels = ['📈 Visão Executiva', '🤖 Assistente IA', '💰 Balanço', '🧩 Categorias', '🧾 Notas Fiscais', '🔎 Movimentações', '🏷️ Cobranças', '🌐 HTMLs', '📥 Downloads']
-is_admin_tab = st.session_state.get('user_role') == 'admin'
-if is_admin_tab:
-    tab_labels.append('🛠️ Admin')
 tabs = st.tabs(tab_labels)
-aba_exec, aba_ia, aba_balanco, aba_cat, aba_nf, aba_mov, aba_cob, aba_dash, aba_dl = tabs[:9]
-aba_admin = tabs[9] if is_admin_tab else None
+aba_exec, aba_ia, aba_balanco, aba_cat, aba_nf, aba_mov, aba_cob, aba_dash, aba_dl = tabs
 
 with aba_exec:
     r1c1, r1c2 = st.columns(2)
@@ -1208,147 +1349,3 @@ with aba_dl:
                 with open(arq, 'rb') as f:
                     st.download_button(label=f'Baixar {arq.name}', data=f, file_name=arq.name, mime=mime, key=f'dl_{arq.name}', width='stretch')
                 st.caption(f'Tamanho: {round(arq.stat().st_size / 1024, 1)} KB')
-
-if aba_admin is not None:
-    with aba_admin:
-        st.markdown('<div class="section-title">⚙️ Operação</div>', unsafe_allow_html=True)
-        uploads = st.file_uploader('Selecione os PDFs', type=['pdf'], accept_multiple_files=True, label_visibility='collapsed')
-        csave, crun = st.columns(2)
-        with csave:
-            if uploads and st.button('📥 Salvar', key='btn_save', use_container_width=True):
-                qtd = salvar_uploads(uploads)
-                st.toast(f'{qtd} arquivo(s) salvo(s).', icon='✅')
-        with crun:
-            btn_exec = st.button('▶ Executar', key='btn_run', type='primary', use_container_width=True)
-            if btn_exec:
-                if not listar_pdfs():
-                    st.warning('Nenhum PDF salvo em ArquivosPDF.')
-                else:
-                    with st.spinner('Processando...'):
-                        ok, codigo, log_texto = executar_runner_com_log()
-                        st.session_state['ultimo_log_auditoria'] = log_texto
-                        st.session_state['ultimo_status_auditoria'] = (ok, codigo)
-                    if ok:
-                        st.toast('Auditoria concluída com sucesso!', icon='✅')
-                    else:
-                        st.error(f'Falha na auditoria. Código: {codigo}')
-
-        pdfs = listar_pdfs()
-        if pdfs:
-            with st.expander(f'📂 PDFs prontos ({len(pdfs)})', expanded=False):
-                for nome in pdfs:
-                    st.markdown(f'<div class="sidebar-pdf-item">{nome}</div>', unsafe_allow_html=True)
-
-        with st.expander('📋 Último log', expanded=False):
-            if 'ultimo_log_auditoria' in st.session_state:
-                st.code(st.session_state['ultimo_log_auditoria'], language='')
-            else:
-                st.caption('Execute a auditoria para gerar logs.')
-
-        st.divider()
-
-        tab1, tab2, tab3 = st.tabs(["📊 Logs", "👥 Online", "➕ Novo"])
-
-        with tab1:
-            logs = logs_acesso.ler_logs()
-            if logs:
-                st.caption(f'{len(logs)} registro(s)')
-                df_logs = pd.DataFrame(logs)
-                try:
-                    st.dataframe(df_logs.tail(30), hide_index=True, use_container_width=True, height=200)
-                except Exception:
-                    st.table(df_logs.tail(30).astype(str))
-                if st.button('🗑️ Limpar Logs', key='clear_logs', use_container_width=True):
-                    if hasattr(logs_acesso, 'LOG_FILE') and logs_acesso.LOG_FILE.exists():
-                        logs_acesso.LOG_FILE.unlink()
-                    logs_acesso.init_logs()
-                    st.toast('Logs limpos!', icon='🗑️')
-                    st.rerun()
-            else:
-                st.caption('Nenhum log registrado.')
-
-        with tab2:
-            all_users = get_all_users()
-            online_users = [(u, info) for u, info in all_users.items() if is_user_online(u, minutes=5)]
-            offline_users = [(u, info) for u, info in all_users.items() if not is_user_online(u, minutes=5)]
-
-            col_refresh, col_count = st.columns([1, 1])
-            with col_refresh:
-                if st.button('🔄 Atualizar', key='refresh_users', use_container_width=True):
-                    st.rerun()
-            with col_count:
-                st.markdown(f'<div style="text-align:right;font-size:0.75rem;color:#64748b;padding-top:0.2rem;">{len(online_users)} online</div>', unsafe_allow_html=True)
-
-            if online_users:
-                for u, info in online_users:
-                    last_seen = info.get('last_seen')
-                    time_str = datetime.fromisoformat(last_seen).strftime("%H:%M") if last_seen else "—"
-                    role_badge = "Admin" if info.get('role') == 'admin' else "Viewer"
-                    bdg = "sidebar-badge-admin" if info.get('role') == 'admin' else "sidebar-badge-viewer"
-                    st.markdown(f'''
-                    <div class="sidebar-user-item">
-                        <div class="sidebar-user-item-left">
-                            <span style="width:8px;height:8px;border-radius:50%;background:#34d399;flex-shrink:0;"></span>
-                            <div>
-                                <div class="sidebar-user-item-name">{u}</div>
-                                <div class="sidebar-user-item-time">{time_str}</div>
-                            </div>
-                        </div>
-                        <span class="sidebar-badge {bdg}">{role_badge}</span>
-                    </div>
-                    ''', unsafe_allow_html=True)
-            else:
-                st.info('Ninguém online no momento.')
-
-            if offline_users:
-                with st.expander(f"Offline ({len(offline_users)})"):
-                    for u, info in offline_users:
-                        last_seen = info.get('last_seen')
-                        time_str = datetime.fromisoformat(last_seen).strftime("%d/%m %H:%M") if last_seen else "Nunca"
-                        role_badge = "Admin" if info.get('role') == 'admin' else "Viewer"
-                        bdg = "sidebar-badge-admin" if info.get('role') == 'admin' else "sidebar-badge-viewer"
-                        st.markdown(f'''
-                        <div class="sidebar-user-item">
-                            <div class="sidebar-user-item-left">
-                                <span style="width:8px;height:8px;border-radius:50%;background:#6b7280;flex-shrink:0;"></span>
-                                <div>
-                                    <div class="sidebar-user-item-name">{u}</div>
-                                    <div class="sidebar-user-item-time">{time_str}</div>
-                                </div>
-                            </div>
-                            <span class="sidebar-badge {bdg}">{role_badge}</span>
-                        </div>
-                        ''', unsafe_allow_html=True)
-
-        with tab3:
-            with st.form("create_user_form", border=False):
-                new_username = st.text_input('Usuário', placeholder='Nome')
-                new_password = st.text_input('Senha', type='password', placeholder='Senha')
-                confirm_password = st.text_input('Confirmar', type='password', placeholder='Confirme')
-                user_role = st.selectbox('Perfil', ['viewer', 'admin'])
-
-                if st.form_submit_button('➕ Criar Usuário', use_container_width=True):
-                    if not new_username or not new_password:
-                        st.error('Preencha todos os campos.')
-                    elif new_password != confirm_password:
-                        st.error('Senhas não conferem.')
-                    elif len(new_password) < 6:
-                        st.error('Mínimo 6 caracteres.')
-                    else:
-                        all_users = get_all_users()
-                        if new_username in all_users:
-                            st.error('Usuário já existe.')
-                        else:
-                            users = get_all_users()
-                            users[new_username] = {
-                                'password_hash': hash_password(new_password),
-                                'role': user_role,
-                                'created_at': datetime.now().isoformat(),
-                                'last_login': None,
-                                'last_seen': None
-                            }
-                            save_all_users_to_file(users)
-                            st.toast(f'Usuário "{new_username}" criado!', icon='✅')
-                            logs_acesso.log_acesso(st.session_state['username'], 'USER_CREATED',
-                                                 detalhes=f'Usuário {new_username} criado com perfil {user_role}')
-                            st.rerun()
