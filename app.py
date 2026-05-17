@@ -1690,11 +1690,6 @@ with aba_dl:
         st.session_state['pdf_resumo_bytes'] = pdf_bytes
         st.toast('PDF gerado com sucesso!', icon='✅')
     if st.session_state.get('pdf_resumo_bytes'):
-        prog = st.progress(0, text='Gerando PDF...')
-        pdf_bytes = gerar_pdf_resumo(df_bal_f, df_cat_f, df_mov_f, df_cob, df_nf_f, prog=prog)
-        st.session_state['pdf_resumo_bytes'] = pdf_bytes
-        st.toast('PDF gerado com sucesso!', icon='✅')
-    if st.session_state.get('pdf_resumo_bytes'):
         st.download_button('📄 Baixar resumo em PDF', data=st.session_state['pdf_resumo_bytes'], file_name='resumo_auditoria.pdf', mime='application/pdf', use_container_width=True)
         if st.button('🔄 Regenerar PDF', key='btn_regenerar_pdf', use_container_width=True):
             st.session_state.pop('pdf_resumo_bytes', None)
