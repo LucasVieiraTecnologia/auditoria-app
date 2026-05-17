@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# Auditoria Inteligente de Condomínios — Streamlit App
 from __future__ import annotations
 
 import io
