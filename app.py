@@ -50,71 +50,72 @@ def _get_credential(key):
         pass
     return os.getenv(key, '')
 
+def _build_base_users():
+    """Constrói dicionário de usuários a partir de st.secrets / variáveis de ambiente"""
+    user_env = _get_credential('APP_USERNAME')
+    pass_env = _get_credential('APP_PASSWORD')
+    users_str = _get_credential('APP_USERS')
+
+    users = {}
+    if user_env and pass_env:
+        users[user_env] = {
+            'password_hash': hash_password(pass_env),
+            'role': 'admin',
+            'created_at': datetime.now().isoformat(),
+            'last_login': None,
+            'last_seen': None
+        }
+
+    if users_str:
+        for pair in users_str.split(','):
+            if ':' in pair:
+                u, p = pair.split(':', 1)
+                users[u.strip()] = {
+                    'password_hash': hash_password(p.strip()),
+                    'role': 'viewer',
+                    'created_at': datetime.now().isoformat(),
+                    'last_login': None,
+                    'last_seen': None
+                }
+
+    return users
+
 def get_users():
-    """Retorna dicionário de usuários do arquivo users.json (apenas username:password_hash para autenticação)"""
+    """Retorna dicionário de usuários (username -> password_hash)"""
     all_users = get_all_users()
     return {u: info.get('password_hash', '') for u, info in all_users.items()}
 
 def get_all_users():
-    """Retorna dicionário completo de usuários do arquivo users.json"""
+    """Retorna dicionário completo de usuários.
+    Sempre mescla usuários de st.secrets/env vars com os do users.json.
+    Isso garante que usuários criados via UI sobrevivam a redeploys."""
     users_file = Path('users.json')
-    
-    user_env = _get_credential('APP_USERNAME')
-    pass_env = _get_credential('APP_PASSWORD')
-    users_str = _get_credential('APP_USERS')
-    
-    if not users_file.exists():
-        users = {}
-        users[user_env] = {
-            'password_hash': hash_password(pass_env),
-            'role': 'admin',
-            'created_at': datetime.now().isoformat(),
-            'last_login': None,
-            'last_seen': None
-        }
-        
-        if users_str:
-            for pair in users_str.split(','):
-                if ':' in pair:
-                    u, p = pair.split(':', 1)
-                    users[u.strip()] = {
-                        'password_hash': hash_password(p.strip()),
-                        'role': 'viewer',
-                        'created_at': datetime.now().isoformat(),
-                        'last_login': None,
-                        'last_seen': None
-                    }
-        
-        save_all_users_to_file(users)
-        return users
-    
-    try:
-        with open(users_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            return data.get('users', {})
-    except Exception:
-        users = {}
-        users[user_env] = {
-            'password_hash': hash_password(pass_env),
-            'role': 'admin',
-            'created_at': datetime.now().isoformat(),
-            'last_login': None,
-            'last_seen': None
-        }
-        
-        if users_str:
-            for pair in users_str.split(','):
-                if ':' in pair:
-                    u, p = pair.split(':', 1)
-                    users[u.strip()] = {
-                        'password_hash': hash_password(p.strip()),
-                        'role': 'viewer',
-                        'created_at': datetime.now().isoformat(),
-                        'last_login': None,
-                        'last_seen': None
-                    }
-        
-        return users
+    base = _build_base_users()
+
+    # Carrega usuários existentes do disco (preserva last_login, last_seen)
+    disk_users = {}
+    if users_file.exists():
+        try:
+            with open(users_file, 'r', encoding='utf-8') as f:
+                disk_users = json.load(f).get('users', {})
+        except Exception:
+            pass
+
+    # Mescla: secrets/env vars têm prioridade (atualiza hash), mas preserva metadados do disco
+    merged = {}
+    for username in set(list(base.keys()) + list(disk_users.keys())):
+        if username in base:
+            entry = base[username].copy()
+            if username in disk_users:
+                entry['last_login'] = disk_users[username].get('last_login', entry.get('last_login'))
+                entry['last_seen'] = disk_users[username].get('last_seen', entry.get('last_seen'))
+                entry['created_at'] = disk_users[username].get('created_at', entry.get('created_at'))
+            merged[username] = entry
+        else:
+            merged[username] = disk_users[username].copy()
+
+    save_all_users_to_file(merged)
+    return merged
 
 def save_all_users_to_file(users_dict):
     """Salva todos os dados dos usuários no arquivo users.json"""
@@ -260,10 +261,10 @@ def login_screen():
             if check_credentials(username, password):
                 st.session_state['authenticated'] = True
                 st.session_state['username'] = username
-                st.session_state['user_role'] = 'admin' if username == os.getenv('APP_USERNAME', 'admin') else 'viewer'
                 
                 users = get_all_users()
                 if username in users:
+                    st.session_state['user_role'] = users[username].get('role', 'viewer')
                     users[username]['last_login'] = datetime.now().isoformat()
                     users[username]['last_seen'] = datetime.now().isoformat()
                     save_all_users_to_file(users)
