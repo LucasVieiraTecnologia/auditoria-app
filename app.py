@@ -195,25 +195,9 @@ def init_auth():
 def login_screen():
     st.markdown("""
     <style>
-    .stApp {
-        background: linear-gradient(135deg, #0a0f1e 0%, #0f172a 40%, #1a1f36 70%, #0f172a 100%);
-    }
-    .stApp::before {
-        content: '';
-        position: fixed;
-        top: 0; left: 0; width: 100%; height: 100%;
-        background:
-            radial-gradient(ellipse at 20% 50%, rgba(37,99,235,0.12) 0%, transparent 60%),
-            radial-gradient(ellipse at 80% 20%, rgba(6,182,212,0.08) 0%, transparent 50%),
-            radial-gradient(ellipse at 50% 80%, rgba(99,102,241,0.06) 0%, transparent 50%);
-        pointer-events: none;
-        z-index: 0;
-    }
     .block-container {
         max-width: 500px !important;
         padding-top: 2.5rem !important;
-        position: relative;
-        z-index: 1;
     }
     .login-logo {
         text-align: center;
@@ -222,7 +206,7 @@ def login_screen():
     }
     .login-title {
         text-align: center;
-        color: #f1f5f9;
+        color: var(--text-color);
         font-size: 2rem;
         font-weight: 800;
         letter-spacing: -0.03em;
@@ -230,36 +214,38 @@ def login_screen():
     }
     .login-sub {
         text-align: center;
-        color: #94a3b8;
+        color: var(--text-color);
         font-size: 0.9rem;
         margin-bottom: 1.5rem;
+        opacity: 0.6;
     }
     .stForm {
-        background: rgba(255,255,255,0.96);
+        background: var(--secondary-background-color);
         padding: 2.5rem 2rem;
         border-radius: 24px;
-        box-shadow: 0 24px 70px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.06);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+        border: 1px solid rgba(128,128,128,0.12);
     }
     .stTextInput {
         margin-bottom: 0.5rem;
     }
     .stTextInput input {
         border-radius: 12px !important;
-        border: 2px solid #e2e8f0 !important;
+        border: 2px solid rgba(128,128,128,0.2) !important;
         padding: 14px 16px !important;
         font-size: 15px !important;
-        background: #f8fafc !important;
+        background: var(--background-color) !important;
+        color: var(--text-color) !important;
         transition: all 0.2s ease !important;
     }
     .stTextInput input:focus {
-        border-color: #2563eb !important;
-        box-shadow: 0 0 0 4px rgba(37,99,235,0.12) !important;
-        background: #fff !important;
+        border-color: var(--primary-color) !important;
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary-color) 15%, transparent) !important;
     }
     .stButton button {
         width: 100%;
         border-radius: 12px;
-        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        background: linear-gradient(135deg, var(--primary-color), color-mix(in srgb, var(--primary-color) 80%, #000));
         color: white;
         font-weight: 700;
         font-size: 16px;
@@ -269,15 +255,18 @@ def login_screen():
         margin-top: 0.75rem;
     }
     .stButton button:hover {
-        background: linear-gradient(135deg, #1d4ed8, #1e40af);
+        filter: brightness(1.1);
         transform: translateY(-1px);
-        box-shadow: 0 8px 20px rgba(37,99,235,0.3);
+        box-shadow: 0 8px 20px color-mix(in srgb, var(--primary-color) 40%, transparent);
     }
     .stButton button:active {
         transform: translateY(0);
     }
-    .st-emotion-cache-1jicfl2 {
-        padding-top: 1rem;
+    @media (max-width: 768px) {
+        .block-container { max-width: 100% !important; padding: 1rem !important; }
+        .stForm { padding: 1.5rem !important; }
+        .login-title { font-size: 1.5rem !important; }
+        .login-logo { font-size: 2.5rem !important; }
     }
     </style>
     """, unsafe_allow_html=True)
@@ -410,7 +399,6 @@ html, body, [class*="css"] {font-family: 'Inter', 'Segoe UI', sans-serif;}
 .stMultiSelect [data-baseweb=tag] {background-color:#2563eb !important; border-radius:999px !important;}
 .stTabs [data-baseweb=tab-list] {gap:6px; border-bottom:1px solid rgba(148,163,184,.28);}
 .stTabs [data-baseweb=tab] {border-radius:12px 12px 0 0; font-weight:700; padding:10px 16px;}
-[data-testid=stSidebar] {background:#0f172a; border-right:1px solid rgba(255,255,255,.08);}
 @media (max-width: 900px) {.hero-stats {grid-template-columns:1fr 1fr;} .block-container {padding-left:1rem; padding-right:1rem;}}
 </style>
 ''', unsafe_allow_html=True)
@@ -738,67 +726,51 @@ with st.sidebar:
     st.markdown("""
     <style>
     [data-testid=stSidebar] {
-        background: #0a0f1e;
-        border-right: 1px solid rgba(255,255,255,.06);
-    }
-    [data-testid=stSidebar] .stApp {
-        background: transparent;
-    }
-    .sidebar-section {
-        margin-bottom: 0.75rem;
+        background: var(--secondary-background-color);
+        border-right: 1px solid color-mix(in srgb, var(--text-color) 10%, transparent);
     }
     .sidebar-section-title {
         font-size: 0.72rem;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.08em;
-        color: #64748b;
+        color: var(--text-color);
+        opacity: 0.5;
         margin-bottom: 0.5rem;
         padding: 0 0.25rem;
     }
     .sidebar-card {
-        background: rgba(255,255,255,.04);
-        border: 1px solid rgba(255,255,255,.08);
+        background: color-mix(in srgb, var(--text-color) 4%, transparent);
+        border: 1px solid color-mix(in srgb, var(--text-color) 10%, transparent);
         border-radius: 14px;
         padding: 0.75rem 1rem;
         margin-bottom: 0.5rem;
-    }
-    .sidebar-user-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.5rem;
-    }
-    .sidebar-user-info {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        min-width: 0;
     }
     .sidebar-user-avatar {
         width: 32px;
         height: 32px;
         border-radius: 50%;
-        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        background: linear-gradient(135deg, var(--primary-color), color-mix(in srgb, var(--primary-color) 80%, #000));
         display: flex;
         align-items: center;
         justify-content: center;
         font-weight: 800;
         font-size: 0.8rem;
-        color: #f8fafc;
+        color: white;
         flex-shrink: 0;
     }
     .sidebar-user-name {
         font-weight: 700;
         font-size: 0.85rem;
-        color: #f1f5f9;
+        color: var(--text-color);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
     .sidebar-user-role {
         font-size: 0.7rem;
-        color: #94a3b8;
+        color: var(--text-color);
+        opacity: 0.5;
         font-weight: 600;
     }
     .sidebar-badge {
@@ -811,24 +783,24 @@ with st.sidebar:
         font-weight: 700;
     }
     .sidebar-badge-online {
-        background: rgba(16,185,129,.15);
+        background: color-mix(in srgb, #34d399 15%, transparent);
         color: #34d399;
-        border: 1px solid rgba(16,185,129,.25);
+        border: 1px solid color-mix(in srgb, #34d399 25%, transparent);
     }
     .sidebar-badge-offline {
-        background: rgba(107,114,128,.15);
+        background: color-mix(in srgb, #9ca3af 15%, transparent);
         color: #9ca3af;
-        border: 1px solid rgba(107,114,128,.25);
+        border: 1px solid color-mix(in srgb, #9ca3af 25%, transparent);
     }
     .sidebar-badge-admin {
-        background: rgba(37,99,235,.15);
-        color: #60a5fa;
-        border: 1px solid rgba(37,99,235,.25);
+        background: color-mix(in srgb, var(--primary-color) 15%, transparent);
+        color: var(--primary-color);
+        border: 1px solid color-mix(in srgb, var(--primary-color) 25%, transparent);
     }
     .sidebar-badge-viewer {
-        background: rgba(16,185,129,.15);
+        background: color-mix(in srgb, #34d399 15%, transparent);
         color: #34d399;
-        border: 1px solid rgba(16,185,129,.25);
+        border: 1px solid color-mix(in srgb, #34d399 25%, transparent);
     }
     .sidebar-user-item {
         display: flex;
@@ -836,63 +808,32 @@ with st.sidebar:
         justify-content: space-between;
         padding: 0.5rem 0.65rem;
         border-radius: 10px;
-        background: rgba(255,255,255,.03);
-        border: 1px solid rgba(255,255,255,.06);
+        background: color-mix(in srgb, var(--text-color) 3%, transparent);
+        border: 1px solid color-mix(in srgb, var(--text-color) 8%, transparent);
         margin-bottom: 0.35rem;
-    }
-    .sidebar-user-item-left {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        min-width: 0;
     }
     .sidebar-user-item-name {
         font-weight: 600;
         font-size: 0.8rem;
-        color: #e2e8f0;
+        color: var(--text-color);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
     .sidebar-user-item-time {
         font-size: 0.65rem;
-        color: #64748b;
-    }
-    .sidebar-btn {
-        width: 100%;
-        border-radius: 10px !important;
-        font-weight: 700 !important;
-        font-size: 0.82rem !important;
-        border: 1px solid rgba(255,255,255,.1) !important;
-        transition: all 0.15s ease !important;
-    }
-    .sidebar-btn:hover {
-        border-color: rgba(255,255,255,.2) !important;
-    }
-    .sidebar-btn-primary {
-        background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
-        border: none !important;
-        color: white !important;
-    }
-    .sidebar-btn-primary:hover {
-        background: linear-gradient(135deg, #1d4ed8, #1e40af) !important;
-        box-shadow: 0 4px 16px rgba(37,99,235,.3) !important;
-    }
-    .sidebar-btn-danger {
-        color: #fca5a5 !important;
-        border-color: rgba(239,68,68,.2) !important;
-    }
-    .sidebar-btn-danger:hover {
-        background: rgba(239,68,68,.1) !important;
+        color: var(--text-color);
+        opacity: 0.5;
     }
     .sidebar-divider {
         height: 1px;
-        background: linear-gradient(90deg, transparent, rgba(148,163,184,.2), transparent);
+        background: color-mix(in srgb, var(--text-color) 12%, transparent);
         margin: 0.75rem 0;
     }
     .sidebar-pdf-item {
         font-size: 0.75rem;
-        color: #94a3b8;
+        color: var(--text-color);
+        opacity: 0.6;
         padding: 0.2rem 0;
         white-space: nowrap;
         overflow: hidden;
@@ -900,7 +841,6 @@ with st.sidebar:
     }
     .sidebar-pdf-item::before {
         content: '•';
-        color: #475569;
         margin-right: 0.4rem;
     }
     .sidebar-log-area {
@@ -909,50 +849,38 @@ with st.sidebar:
         font-size: 0.7rem;
         line-height: 1.4;
     }
-    .sidebar-log-area::-webkit-scrollbar {
-        width: 4px;
-    }
-    .sidebar-log-area::-webkit-scrollbar-track {
-        background: transparent;
-    }
+    .sidebar-log-area::-webkit-scrollbar { width: 4px; }
+    .sidebar-log-area::-webkit-scrollbar-track { background: transparent; }
     .sidebar-log-area::-webkit-scrollbar-thumb {
-        background: rgba(148,163,184,.2);
+        background: color-mix(in srgb, var(--text-color) 15%, transparent);
         border-radius: 4px;
     }
     [data-testid=stSidebar] .stTabs [data-baseweb=tab] {
         font-size: 0.7rem !important;
         padding: 0.4rem 0.5rem !important;
     }
-    [data-testid=stSidebar] .stTabs [data-baseweb=tab-list] {
-        gap: 2px !important;
-    }
+    [data-testid=stSidebar] .stTabs [data-baseweb=tab-list] { gap: 2px !important; }
     [data-testid=stSidebar] .stTextInput input {
-        background: rgba(255,255,255,.06) !important;
-        border: 1px solid rgba(255,255,255,.1) !important;
+        background: color-mix(in srgb, var(--text-color) 6%, transparent) !important;
+        border: 1px solid color-mix(in srgb, var(--text-color) 15%, transparent) !important;
         border-radius: 10px !important;
-        color: #f1f5f9 !important;
+        color: var(--text-color) !important;
         font-size: 0.82rem !important;
     }
     [data-testid=stSidebar] .stTextInput input:focus {
-        border-color: #2563eb !important;
-        box-shadow: 0 0 0 3px rgba(37,99,235,.15) !important;
+        border-color: var(--primary-color) !important;
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 20%, transparent) !important;
     }
     [data-testid=stSidebar] .stSelectbox div[data-baseweb=select] > div {
-        background: rgba(255,255,255,.06) !important;
-        border: 1px solid rgba(255,255,255,.1) !important;
+        background: color-mix(in srgb, var(--text-color) 6%, transparent) !important;
+        border: 1px solid color-mix(in srgb, var(--text-color) 15%, transparent) !important;
         border-radius: 10px !important;
-    }
-    [data-testid=stSidebar] .st-b7 {
-        color: #f1f5f9 !important;
-    }
-    [data-testid=stSidebar] .st-emotion-cache-1aej7m3 {
-        color: #94a3b8 !important;
     }
     </style>
     """, unsafe_allow_html=True)
     
     # ── HEADER ──
-    st.markdown('<div style="display:flex;align-items:center;gap:0.6rem;padding:0.25rem 0 0.75rem 0;"><span style="font-size:1.4rem;">🏢</span><div><div style="font-weight:800;font-size:0.95rem;color:#f1f5f9;">Condomínio</div><div style="font-size:0.7rem;color:#64748b;font-weight:600;">Candelária</div></div></div>', unsafe_allow_html=True)
+    st.markdown('<div style="display:flex;align-items:center;gap:0.6rem;padding:0.25rem 0 0.75rem 0;"><span style="font-size:1.4rem;">🏢</span><div><div style="font-weight:800;font-size:0.95rem;color:var(--text-color);">Condomínio</div><div style="font-size:0.7rem;color:var(--text-color);opacity:0.5;font-weight:600;">Candelária</div></div></div>', unsafe_allow_html=True)
     
     # ── OPERAÇÃO ──
     st.markdown('<div class="sidebar-section-title">⚙️ Operação</div>', unsafe_allow_html=True)
@@ -1063,7 +991,7 @@ with st.sidebar:
                 if st.button('🔄 Atualizar', key='refresh_users', use_container_width=True):
                     st.rerun()
             with col_count:
-                st.markdown(f'<div style="text-align:right;font-size:0.75rem;color:#64748b;padding-top:0.2rem;">{len(online_users)} online</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="text-align:right;font-size:0.75rem;color:var(--text-color);opacity:0.5;padding-top:0.2rem;">{len(online_users)} online</div>', unsafe_allow_html=True)
             
             if online_users:
                 for u, info in online_users:
