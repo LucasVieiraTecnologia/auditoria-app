@@ -1272,20 +1272,27 @@ with aba_nf:
             if col in df_display.columns:
                 df_display[col] = df_display[col].apply(lambda x: str(x).strip() if pd.notna(x) and str(x).strip() != '' else '')
         try:
-            st.dataframe(df_display.astype(str), width='stretch', hide_index=True)
+            st.dataframe(
+                df_display,
+                width='stretch',
+                hide_index=True,
+                column_config={
+                    'Link_Consulta_NF': st.column_config.LinkColumn('Link consulta NF'),
+                    'Link_Origem_NF': st.column_config.LinkColumn('Link original'),
+                    'Valor_Real': st.column_config.NumberColumn('Valor', format='R$ %.2f'),
+                },
+            )
         except Exception:
+            # Fallback: format Valor_Real as R$ string and show as text
+            if 'Valor_Real' in df_display.columns:
+                df_display['Valor_Real'] = df_display['Valor_Real'].apply(lambda x: moeda_br(x) if pd.notna(x) else '')
             try:
-                st.table(df_display.astype(str).fillna('').head(50))
+                st.dataframe(df_display.astype(str), width='stretch', hide_index=True)
             except Exception:
-                st.warning('Não foi possível exibir a tabela.')
-        
-        imagens = [p for p in df_nf_f['Link_NF'].dropna().astype(str).unique().tolist() if Path(p).exists()] if 'Link_NF' in df_nf_f.columns else []
-        if imagens:
-            st.markdown('<div class="section-title">Amostra das imagens extraídas</div>', unsafe_allow_html=True)
-            cols_img = st.columns(4)
-            for idx, caminho in enumerate(imagens[:12]):
-                with cols_img[idx % 4]:
-                    st.image(caminho, caption=Path(caminho).name, width='stretch')
+                try:
+                    st.table(df_display.astype(str).fillna('').head(50))
+                except Exception:
+                    st.warning('Não foi possível exibir a tabela.')
 
 with aba_mov:
     st.markdown('<div class="section-title">Movimentações Analíticas</div>', unsafe_allow_html=True)
@@ -1318,17 +1325,31 @@ with aba_mov:
     except Exception:
         st.table(preparar_exibicao(df_mov_f).astype(str).head(50))
     
-    # Quick-access NF images in the movimentações tab
-    if not df_nf_f.empty and 'Link_NF' in df_nf_f.columns:
-        st.markdown(f'<div class="section-title">🖼️ Notas fiscais vinculadas ({qtd_nf})</div>', unsafe_allow_html=True)
-        imgs_mov = [(p, Path(p)) for p in df_nf_f['Link_NF'].dropna().astype(str).unique().tolist() if p and Path(p).exists()]
-        if imgs_mov:
-            cols = st.columns(6)
-            for i, (path, pp) in enumerate(imgs_mov[:18]):
-                with cols[i % 6]:
-                    st.image(path, caption=pp.name[:20], width='stretch')
-        else:
-            st.caption('Execute a auditoria para gerar as imagens das notas fiscais.')
+    # Lista de itens com NF — clicável
+    if not df_nf_f.empty:
+        st.markdown(f'<div class="section-title">🖼️ Itens com nota fiscal ({qtd_nf})</div>', unsafe_allow_html=True)
+        df_mov_nf = df_nf_f.reset_index(drop=True).copy()
+        df_mov_nf['_r'] = df_mov_nf.apply(lambda r: f"{r.get('Data', '') or ''} | {r.get('Fornecedor', '') or '—'} | {moeda_br(r.get('Valor_Real', 0))} | {str(r.get('Descricao', ''))[:60]}", axis=1)
+        busca_mov = st.text_input('🔍 Buscar na movimentação', placeholder='Fornecedor, descrição...', key='busca_mov_nf')
+        mask = (df_mov_nf['_r'].fillna('').str.lower().str.contains(busca_mov.lower())) if busca_mov else pd.Series([True]*len(df_mov_nf))
+        for _, r in df_mov_nf[mask].head(40).iterrows():
+            tem_img = bool(r.get('Link_NF')) and Path(str(r.get('Link_NF', ''))).exists()
+            ico = '🖼️' if tem_img else '📄'
+            with st.expander(f"{ico} {r['_r']}", expanded=False):
+                c1, c2 = st.columns([1.2, 1])
+                with c1:
+                    p = str(r.get('Link_NF', '') or '')
+                    if tem_img:
+                        st.image(p, caption=Path(p).name, width='stretch')
+                    else:
+                        st.info('Imagem não disponível')
+                with c2:
+                    st.markdown(f"**Fornecedor:** {html.escape(str(r.get('Fornecedor', '')))}")
+                    st.markdown(f"**Descrição:** {html.escape(str(r.get('Descricao', '')))}")
+                    st.markdown(f"**Valor:** {moeda_br(r.get('Valor_Real', 0))}")
+                    lnk = str(r.get('Link_Origem_NF', '') or '')
+                    if lnk:
+                        st.link_button('🔗 Link original', lnk, width='stretch')
     
 with aba_cob:
     st.markdown('<div class="section-title">Composição das Cobranças</div>', unsafe_allow_html=True)
