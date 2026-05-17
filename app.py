@@ -6,6 +6,7 @@ import io
 import html
 import json
 import os
+os.environ.setdefault('CHROME_PATH', r'C:\Program Files\Google\Chrome\Application\chrome.exe')
 import re
 import hashlib
 import shutil
