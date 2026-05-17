@@ -1490,7 +1490,6 @@ with aba_nf:
         st.divider()
         st.markdown('<div class="section-title">Tabela completa</div>', unsafe_allow_html=True)
 
-        cols_nf_display = [c for c in ['Data', 'Fornecedor', 'Descricao', 'Valor_Real', 'Numero_NF', 'Status_Consulta_NF', 'Categoria'] if c in nf_table.columns]
         page_size = 25
         total_items = len(nf_table)
         total_pages = max(1, (total_items + page_size - 1) // page_size)
@@ -1504,33 +1503,27 @@ with aba_nf:
 
         start = (page - 1) * page_size
         end = start + page_size
-        page_df = nf_table.iloc[start:end][cols_nf_display].reset_index(drop=True)
-        page_df.insert(0, '_acao', '👁️')
+        page_df = nf_table.iloc[start:end].reset_index(drop=True)
 
-        sel = st.dataframe(
-            page_df,
-            width='stretch',
-            hide_index=True,
-            use_container_width=True,
-            column_config={
-                '_acao': st.column_config.TextColumn('Ver mais', width='small'),
-                'Valor_Real': st.column_config.NumberColumn('Valor', format='R$ %.2f'),
-                'Data': st.column_config.TextColumn('Data'),
-                'Fornecedor': st.column_config.TextColumn('Fornecedor', width='medium'),
-                'Descricao': st.column_config.TextColumn('Descrição', width='large'),
-            },
-            key='nf_dataframe',
-            on_select='rerun',
-            selection_mode='single-row',
-        )
+        hdr = st.columns([0.6, 1.2, 2.5, 1, 2.2])
+        hdr[0].markdown('**Ver mais**')
+        hdr[1].markdown('**Data**')
+        hdr[2].markdown('**Fornecedor**')
+        hdr[3].markdown('**Valor**')
+        hdr[4].markdown('**Descrição**')
 
-        if sel and sel.selection and sel.selection.rows:
-            idx = sel.selection.rows[0]
-            real_idx = start + idx
-            row = nf_table.iloc[real_idx].to_dict()
-            st.session_state['popup_row'] = row
-            st.session_state['popup_tem_img'] = bool(row.get('Link_NF')) and Path(str(row.get('Link_NF', ''))).exists()
-            detail_dialog()
+        for idx in range(len(page_df)):
+            r = page_df.iloc[idx]
+            c = st.columns([0.6, 1.2, 2.5, 1, 2.2])
+            if c[0].button('🔍', key=f'nf_exp_{page}_{idx}', help='Ver detalhes'):
+                real_idx = start + idx
+                st.session_state['popup_row'] = nf_table.iloc[real_idx].to_dict()
+                st.session_state['popup_tem_img'] = bool(nf_table.iloc[real_idx].get('Link_NF')) and Path(str(nf_table.iloc[real_idx].get('Link_NF', ''))).exists()
+                detail_dialog()
+            c[1].write(str(r.get('Data', '') or ''))
+            c[2].write(html.escape(str(r.get('Fornecedor', '') or ''))[:50])
+            c[3].write(moeda_br(r.get('Valor_Real', 0)))
+            c[4].write(html.escape(str(r.get('Descricao', '') or ''))[:60])
 
         if total_pages > 1:
             paginator = st.columns([1, 2, 1, 2, 1])
@@ -1584,7 +1577,6 @@ with aba_mov:
         if ordem_mov in sort_map and sort_map[ordem_mov][0] in detalhes_filter.columns:
             detalhes_filter = detalhes_filter.sort_values(sort_map[ordem_mov][0], ascending=sort_map[ordem_mov][1])
 
-        cols_mov_display = [c for c in ['Data', 'Fornecedor', 'Descricao', 'Valor_Real', 'Categoria', 'Conta', 'Tipo_Movimento'] if c in detalhes_filter.columns]
         page_size = 25
         total_items = len(detalhes_filter)
         total_pages = max(1, (total_items + page_size - 1) // page_size)
@@ -1599,33 +1591,27 @@ with aba_mov:
         st.caption(f'{total_items} itens')
         start = (page - 1) * page_size
         end = start + page_size
-        page_df = detalhes_filter.iloc[start:end][cols_mov_display].reset_index(drop=True)
-        page_df.insert(0, '_acao', '👁️')
+        page_df = detalhes_filter.iloc[start:end].reset_index(drop=True)
 
-        sel = st.dataframe(
-            page_df,
-            width='stretch',
-            hide_index=True,
-            use_container_width=True,
-            column_config={
-                '_acao': st.column_config.TextColumn('Ver mais', width='small'),
-                'Valor_Real': st.column_config.NumberColumn('Valor', format='R$ %.2f'),
-                'Data': st.column_config.TextColumn('Data'),
-                'Fornecedor': st.column_config.TextColumn('Fornecedor', width='medium'),
-                'Descricao': st.column_config.TextColumn('Descrição', width='large'),
-            },
-            key='mov_dataframe',
-            on_select='rerun',
-            selection_mode='single-row',
-        )
+        hdr = st.columns([0.6, 1.2, 2.5, 1, 2.2])
+        hdr[0].markdown('**Ver mais**')
+        hdr[1].markdown('**Data**')
+        hdr[2].markdown('**Fornecedor**')
+        hdr[3].markdown('**Valor**')
+        hdr[4].markdown('**Descrição**')
 
-        if sel and sel.selection and sel.selection.rows:
-            idx = sel.selection.rows[0]
-            real_idx = start + idx
-            row = detalhes_filter.iloc[real_idx].to_dict()
-            st.session_state['popup_row'] = row
-            st.session_state['popup_tem_img'] = bool(row.get('Link_NF')) and Path(str(row.get('Link_NF', ''))).exists()
-            detail_dialog()
+        for idx in range(len(page_df)):
+            r = page_df.iloc[idx]
+            c = st.columns([0.6, 1.2, 2.5, 1, 2.2])
+            if c[0].button('🔍', key=f'mov_exp_{page}_{idx}', help='Ver detalhes'):
+                real_idx = start + idx
+                st.session_state['popup_row'] = detalhes_filter.iloc[real_idx].to_dict()
+                st.session_state['popup_tem_img'] = bool(detalhes_filter.iloc[real_idx].get('Link_NF')) and Path(str(detalhes_filter.iloc[real_idx].get('Link_NF', ''))).exists()
+                detail_dialog()
+            c[1].write(str(r.get('Data', '') or ''))
+            c[2].write(html.escape(str(r.get('Fornecedor', '') or ''))[:50])
+            c[3].write(moeda_br(r.get('Valor_Real', 0)))
+            c[4].write(html.escape(str(r.get('Descricao', '') or ''))[:60])
 
         if total_pages > 1:
             paginator = st.columns([1, 2, 1, 2, 1])
