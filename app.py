@@ -1505,7 +1505,6 @@ with aba_nf:
         start = (page - 1) * page_size
         end = start + page_size
         page_df = nf_table.iloc[start:end][cols_nf_display].reset_index(drop=True)
-        page_df.insert(0, '🔍', ' ')
 
         st.caption('💡 Clique em uma linha para ver detalhes')
         sel = st.dataframe(
@@ -1514,7 +1513,6 @@ with aba_nf:
             hide_index=True,
             use_container_width=True,
             column_config={
-                '🔍': st.column_config.TextColumn('Ver mais', width='small'),
                 'Valor_Real': st.column_config.NumberColumn('Valor', format='R$ %.2f'),
                 'Data': st.column_config.TextColumn('Data'),
                 'Fornecedor': st.column_config.TextColumn('Fornecedor', width='medium'),
@@ -1601,7 +1599,6 @@ with aba_mov:
         start = (page - 1) * page_size
         end = start + page_size
         page_df = detalhes_filter.iloc[start:end][cols_mov_display].reset_index(drop=True)
-        page_df.insert(0, '🔍', ' ')
 
         st.caption('💡 Clique em uma linha para ver detalhes')
         sel = st.dataframe(
@@ -1610,7 +1607,6 @@ with aba_mov:
             hide_index=True,
             use_container_width=True,
             column_config={
-                '🔍': st.column_config.TextColumn('Ver mais', width='small'),
                 'Valor_Real': st.column_config.NumberColumn('Valor', format='R$ %.2f'),
                 'Data': st.column_config.TextColumn('Data'),
                 'Fornecedor': st.column_config.TextColumn('Fornecedor', width='medium'),
