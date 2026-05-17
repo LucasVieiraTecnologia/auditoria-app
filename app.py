@@ -683,13 +683,25 @@ def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf, prog=None, secoes=No
             except Exception:
                 font_t = font_l = font_v = ImageFont.load_default()
             draw.text((10, 6), title, fill=(20, 20, 40), font=font_t)
-            bar_area_w = width - 220
+            max_lw = 0
+            for i in range(n):
+                lw = draw.textlength(str(labels[i])[:24], font=font_l)
+                max_lw = max(max_lw, lw)
+            label_x = 10
+            label_w = min(max_lw + 8, 180)
+            bar_x = label_x + label_w
+            bar_area_w = width - bar_x - 10
             for i in range(n):
                 y = title_h + i * (bar_h + 6)
-                draw.text((8, y + 3), str(labels[i])[:28], fill=(60, 60, 80), font=font_l)
+                draw.text((label_x, y + 3), str(labels[i])[:24], fill=(60, 60, 80), font=font_l)
                 bw = int((values[i] / max_v) * bar_area_w) if max_v > 0 else 0
-                draw.rectangle([(170, y), (170 + max(bw, 2), y + bar_h)], fill=(37, 99, 235))
-                draw.text((170 + max(bw, 2) + 6, y + 3), moeda_br(values[i]), fill=(20, 20, 40), font=font_v)
+                draw.rectangle([(bar_x, y), (bar_x + max(bw, 2), y + bar_h)], fill=(37, 99, 235))
+                val_txt = moeda_br(values[i])
+                val_w = draw.textlength(val_txt, font=font_v)
+                vx = bar_x + max(bw, 2) + 4
+                if vx + val_w > width - 4:
+                    vx = width - val_w - 4
+                draw.text((vx, y + 3), val_txt, fill=(20, 20, 40), font=font_v)
             buf = io_module.BytesIO()
             img.save(buf, format='PNG')
             return buf.getvalue()
