@@ -669,6 +669,81 @@ def dashboards_existentes() -> list[tuple[str, Path]]:
 def arquivos_download_existentes() -> list[Path]:
     return [p for p in ARQUIVOS_DOWNLOAD if p.exists()]
 
+def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf):
+    try:
+        import fitz
+        doc = fitz.open()
+        page = doc.new_page()
+        y = 50
+        def txt(text, bold=False, size=11):
+            nonlocal y
+            if y > 760:
+                page = doc.new_page()
+                y = 50
+            page.insert_text((50, y), text, fontname='helv' if not bold else 'helvb', fontsize=size)
+            y += size * 1.5
+        
+        txt('RESUMO DA AUDITORIA', bold=True, size=18)
+        txt(f'Gerado em: {datetime.now().strftime("%d/%m/%Y %H:%M")}', size=9)
+        txt('')
+        
+        # Balanço
+        if not df_bal.empty:
+            txt('BALANÇO MENSAL', bold=True, size=14)
+            txt('')
+            for _, r in df_bal.iterrows():
+                vals = []
+                for c in ['Mes_Ano', 'Saldo_Anterior', 'Total_Receitas', 'Total_Despesas', 'Movimento_Liquido', 'Saldo_Final']:
+                    if c in df_bal.columns:
+                        v = r.get(c, '')
+                        vals.append(str(v)[:30])
+                txt(' | '.join(vals), size=8)
+            txt('')
+        
+        # Categorias
+        if not df_cat.empty:
+            txt('CATEGORIAS', bold=True, size=14)
+            txt('')
+            top_cat = df_cat.groupby('Categoria', dropna=False)['Valor'].sum().sort_values(ascending=False).head(15)
+            for cat, val in top_cat.items():
+                txt(f'{str(cat)[:50]}: {moeda_br(val)}', size=9)
+            txt('')
+        
+        # Movimentações
+        if not df_mov.empty:
+            txt('MOVIMENTAÇÕES', bold=True, size=14)
+            txt(f'Total de registros: {len(df_mov)}', size=9)
+            if 'Valor_Real' in df_mov.columns:
+                txt(f'Total movimentado: {moeda_br(df_mov["Valor_Real"].sum())}', size=9)
+            if SCORE_COL in df_mov.columns and df_mov[SCORE_COL].sum() > 0:
+                divg = df_mov[df_mov[SCORE_COL] > 0].sort_values(SCORE_COL, ascending=False).head(10)
+                txt(f'Divergências detectadas: {len(divg)}', bold=True, size=10)
+                for _, r in divg.iterrows():
+                    txt(f'  Score {int(r.get(SCORE_COL, 0))} | {str(r.get("Fornecedor", ""))[:40]} | {moeda_br(r.get("Valor_Real", 0))}', size=8)
+            txt('')
+        
+        # Cobranças
+        if not df_cob.empty:
+            txt('COBRANÇAS', bold=True, size=14)
+            txt(f'Total: {len(df_cob)} registros', size=9)
+            if 'Valor' in df_cob.columns:
+                txt(f'Valor total: {moeda_br(df_cob["Valor"].sum())}', size=9)
+            txt('')
+        
+        # NFs
+        if not df_nf.empty:
+            txt('NOTAS FISCAIS', bold=True, size=14)
+            txt(f'Total vinculadas: {len(df_nf)}', size=9)
+            if 'Valor_Real' in df_nf.columns:
+                txt(f'Valor total: {moeda_br(df_nf["Valor_Real"].sum())}', size=9)
+            txt('')
+        
+        pdf_bytes = doc.write()
+        doc.close()
+        return pdf_bytes
+    except Exception as e:
+        return None
+
 def executar_runner_com_log() -> tuple[bool, int | None, str]:
     buffer_out = io.StringIO()
     buffer_err = io.StringIO()
@@ -1275,7 +1350,10 @@ with aba_nf:
         sort_map = {'Valor (maior → menor)': ('Valor_Real', False), 'Valor (menor → maior)': ('Valor_Real', True), 'Data (recente → antiga)': ('Data', False), 'Data (antiga → recente)': ('Data', True), 'Fornecedor (A → Z)': ('Fornecedor', True)}
         if ordem_nf in sort_map and sort_map[ordem_nf][0] in nf_table.columns:
             nf_table = nf_table.sort_values(sort_map[ordem_nf][0], ascending=sort_map[ordem_nf][1])
-        nf_table = nf_table.head(50).reset_index(drop=True)
+        nf_table_total = nf_table.copy()
+        if 'nf_limit' not in st.session_state:
+            st.session_state['nf_limit'] = 50
+        nf_table = nf_table.head(st.session_state['nf_limit']).reset_index(drop=True)
         
         hdr = st.columns([0.5, 1.3, 2.2, 1, 2])
         hdr[0].markdown('**🔍**')
@@ -1297,6 +1375,13 @@ with aba_nf:
             c[2].write(html.escape(str(r.get('Fornecedor', '') or ''))[:45])
             c[3].write(moeda_br(r.get('Valor_Real', 0)))
             c[4].write(html.escape(str(r.get('Descricao', '') or ''))[:45])
+        
+        if len(nf_table_total) > st.session_state['nf_limit']:
+            rest = len(nf_table_total) - st.session_state['nf_limit']
+            step = min(50, rest)
+            if st.button(f'Mostrar mais {step} itens ({rest} restantes)', key='nf_mostrar_mais', use_container_width=True):
+                st.session_state['nf_limit'] += step
+                st.rerun()
 
 with aba_mov:
     st.markdown('<div class="section-title">Movimentações Analíticas</div>', unsafe_allow_html=True)
@@ -1307,13 +1392,14 @@ with aba_mov:
             grp_all = df_mov_f.groupby(['Mes_Ano', 'Conta', 'Tipo_Movimento'], dropna=False)[['Valor_Entrada', 'Valor_Saida', 'Valor_Transferencia']].sum().reset_index()
             grp_all['Valor'] = grp_all.apply(lambda row: row['Valor_Entrada'] if row['Tipo_Movimento'] == 'Entrada' else (row['Valor_Saida'] if row['Tipo_Movimento'] == 'Saída' else row['Valor_Transferencia']), axis=1)
             contas = sorted(grp_all['Conta'].dropna().astype(str).unique().tolist())
-            contas_sel = st.multiselect('Filtrar contas', contas, default=contas[:min(len(contas), 4)], key='contas_mov_chart')
-            if contas_sel:
-                grp = grp_all[grp_all['Conta'].astype(str).isin(contas_sel)]
-                n_contas = len(contas_sel)
-                fig = px.bar(grp, x='Mes_Ano', y='Valor', color='Tipo_Movimento', facet_col='Conta', facet_col_wrap=min(3, n_contas), height=260 * ((n_contas - 1) // 3 + 2), title='Movimentação analítica por conta', color_discrete_map={'Entrada': COR_ENTRADA, 'Saída': COR_SAIDA, 'Transferência': COR_TRANSFERENCIA})
-                formatar_fig(fig, height=260 * ((n_contas - 1) // 3 + 2), moeda=True)
-                st.plotly_chart(fig, width='stretch')
+            contas_sel = st.multiselect('Filtrar contas', contas, default=[], key='contas_mov_chart', placeholder='Todas as contas')
+            contas_filtro = contas_sel if contas_sel else contas
+            grp = grp_all[grp_all['Conta'].astype(str).isin(contas_filtro)]
+            n_contas = len(contas_filtro)
+            st.markdown('<br>', unsafe_allow_html=True)
+            fig = px.bar(grp, x='Mes_Ano', y='Valor', color='Tipo_Movimento', facet_col='Conta', facet_col_wrap=min(3, n_contas), height=260 * ((n_contas - 1) // 3 + 2), title='Movimentação analítica por conta', color_discrete_map={'Entrada': COR_ENTRADA, 'Saída': COR_SAIDA, 'Transferência': COR_TRANSFERENCIA})
+            formatar_fig(fig, height=260 * ((n_contas - 1) // 3 + 2), moeda=True)
+            st.plotly_chart(fig, width='stretch')
         
         if {'Categoria'}.issubset(df_mov_f.columns):
             cats = ['Todos'] + sorted(df_mov_f['Categoria'].dropna().astype(str).unique().tolist())
@@ -1329,7 +1415,10 @@ with aba_mov:
         sort_map = {'Valor (maior → menor)': ('Valor_Real', False), 'Valor (menor → maior)': ('Valor_Real', True), 'Data (recente → antiga)': ('Data', False), 'Data (antiga → recente)': ('Data', True), 'Fornecedor (A → Z)': ('Fornecedor', True)}
         if ordem_mov in sort_map and sort_map[ordem_mov][0] in detalhes.columns:
             detalhes = detalhes.sort_values(sort_map[ordem_mov][0], ascending=sort_map[ordem_mov][1])
-        detalhes = detalhes.head(50).reset_index(drop=True)
+        detalhes_total = detalhes.copy()
+        if 'mov_limit' not in st.session_state:
+            st.session_state['mov_limit'] = 50
+        detalhes = detalhes.head(st.session_state['mov_limit']).reset_index(drop=True)
         
         cols_mov = [c for c in ['Data', 'Fornecedor', 'Descricao', 'Valor_Real', 'Categoria', 'Conta', 'Tipo_Movimento'] if c in df_mov_f.columns]
         
@@ -1353,6 +1442,13 @@ with aba_mov:
             c[2].write(html.escape(str(r.get('Fornecedor', '') or ''))[:45])
             c[3].write(moeda_br(r.get('Valor_Real', 0)))
             c[4].write(html.escape(str(r.get('Descricao', '') or ''))[:45])
+        
+        if len(detalhes_total) > st.session_state['mov_limit']:
+            rest = len(detalhes_total) - st.session_state['mov_limit']
+            step = min(50, rest)
+            if st.button(f'Mostrar mais {step} itens ({rest} restantes)', key='mov_mostrar_mais', use_container_width=True):
+                st.session_state['mov_limit'] += step
+                st.rerun()
 
 with aba_cob:
     st.markdown('<div class="section-title">Composição das Cobranças</div>', unsafe_allow_html=True)
@@ -1378,6 +1474,11 @@ with aba_dash:
                 components.html(html_data, height=740, scrolling=True)
 with aba_dl:
     st.markdown('<div class="section-title">Downloads dos relatórios</div>', unsafe_allow_html=True)
+    
+    pdf_bytes = gerar_pdf_resumo(df_bal_f, df_cat_f, df_mov_f, df_cob_f, df_nf_f)
+    if pdf_bytes:
+        st.download_button('📄 Baixar resumo em PDF', data=pdf_bytes, file_name='resumo_auditoria.pdf', mime='application/pdf', use_container_width=True)
+    
     existentes = arquivos_download_existentes()
     if not existentes:
         st.info('Nenhum arquivo de saída foi encontrado. Execute a auditoria primeiro.')
