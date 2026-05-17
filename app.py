@@ -1294,21 +1294,16 @@ with aba_nf:
         
         try:
             st.dataframe(
-                df_display,
+                df_display.astype(str),
                 width='stretch',
                 hide_index=True,
-                column_config={
-                    'Link_Consulta_NF': st.column_config.LinkColumn('Link consulta NF'),
-                    'Link_Origem_NF': st.column_config.LinkColumn('Link original'),
-                    'Valor_Real': st.column_config.NumberColumn('Valor', format='R$ %.2f'),
-                },
             )
         except Exception as e:
-            st.error(f"Erro ao exibir tabela interativa: {str(e)}")
+            st.error(f"Erro: {str(e)[:80]}")
             try:
-                st.dataframe(df_display.fillna('').astype(str), width='stretch', hide_index=True)
+                st.table(df_display.astype(str).fillna('').head(50))
             except Exception:
-                st.table(df_display.fillna('').astype(str).head(50))
+                st.warning('Não foi possível exibir a tabela.')
 
         imagens = [p for p in df_nf_f['Link_NF'].dropna().astype(str).unique().tolist() if Path(p).exists()] if 'Link_NF' in df_nf_f.columns else []
         if imagens:
