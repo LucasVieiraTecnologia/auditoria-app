@@ -962,8 +962,8 @@ if is_admin:
                 else:
                     prog_run = st.progress(0, text='Preparando...')
                     ok, codigo, log_texto = executar_runner_com_log(prog=prog_run)
-                        st.session_state['ultimo_log_auditoria'] = log_texto
-                        st.session_state['ultimo_status_auditoria'] = (ok, codigo)
+                    st.session_state['ultimo_log_auditoria'] = log_texto
+                    st.session_state['ultimo_status_auditoria'] = (ok, codigo)
                     if ok:
                         st.toast('Auditoria concluída com sucesso!', icon='✅')
                     else:
