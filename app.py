@@ -429,19 +429,29 @@ def preparar_exibicao(df: pd.DataFrame) -> pd.DataFrame:
     return df.rename(columns={origem: destino for origem, destino in COLUNAS_EXIBICAO.items() if origem in df.columns})
 
 def sanitizar_arrow(df: pd.DataFrame) -> pd.DataFrame:
-    """Sanitiza DataFrame para evitar erros de conversão Arrow (inf, NaN, ints grandes)"""
+    """Sanitiza DataFrame para evitar erros de conversão Arrow (inf, NaN, ints grandes, strings longas)"""
     if df.empty:
         return df
     out = df.copy()
     for col in out.columns:
         if out[col].dtype.kind in 'fc':
             out[col] = out[col].replace([float('inf'), float('-inf')], float('nan'))
-        if out[col].dtype.kind == 'i':
+        elif out[col].dtype.kind in 'iu':
             try:
                 if not out[col].empty and (out[col].max() > 2**53 or out[col].min() < -(2**53)):
                     out[col] = out[col].astype(float)
             except Exception:
                 out[col] = out[col].astype(float)
+        elif out[col].dtype.kind == 'O':
+            safe = []
+            for v in out[col]:
+                if isinstance(v, int) and abs(v) > 2**53:
+                    safe.append(str(v))
+                elif isinstance(v, float) and (v != v or v == float('inf') or v == float('-inf')):
+                    safe.append(None)
+                else:
+                    safe.append(v)
+            out[col] = safe
     return out
 
 def gerar_link_verificacao_nf(chave_nf: str, numero_nf: str = '', tipo: str = '') -> tuple[str, str]:
@@ -774,7 +784,7 @@ if is_admin:
                 st.caption(f'{len(logs)} registro(s)')
                 df_logs = pd.DataFrame(logs)
                 try:
-                    st.dataframe(df_logs.tail(30), hide_index=True, use_container_width=True, height=200)
+                    st.dataframe(sanitizar_arrow(df_logs.tail(30)), hide_index=True, use_container_width=True, height=200)
                 except Exception:
                     st.table(df_logs.tail(30).astype(str))
                 if st.button('🗑️ Limpar Logs', key='clear_logs', use_container_width=True):
