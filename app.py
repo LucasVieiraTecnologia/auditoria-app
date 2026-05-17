@@ -10,6 +10,8 @@ import shutil
 import traceback
 import base64
 import bcrypt
+import hashlib
+import hmac
 from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -32,6 +34,29 @@ import rodar_auditoria_script as runner
 # AUTENTICAÇÃO
 # ==========================================
 import logs_acesso
+
+TOKEN_SECRET = os.getenv('TOKEN_SECRET', 'auditoria-secret-change-in-prod')
+TOKEN_EXPIRY_DAYS = 30
+
+def gerar_token(username: str) -> str:
+    expiry = int((datetime.now() + timedelta(days=TOKEN_EXPIRY_DAYS)).timestamp())
+    payload = base64.urlsafe_b64encode(f"{username}:{expiry}".encode()).decode().rstrip('=')
+    sig = hmac.new(TOKEN_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()[:16]
+    return f"{payload}.{sig}"
+
+def validar_token(token: str) -> str | None:
+    try:
+        payload, sig = token.rsplit('.', 1)
+        expected = hmac.new(TOKEN_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()[:16]
+        if not hmac.compare_digest(sig, expected):
+            return None
+        decoded = base64.urlsafe_b64decode(payload + '==').decode()
+        username, expiry_str = decoded.rsplit(':', 1)
+        if int(expiry_str) < datetime.now().timestamp():
+            return None
+        return username
+    except Exception:
+        return None
 
 st.set_page_config(page_title='Auditoria Inteligente de Condomínios', page_icon='🏢', layout='wide', initial_sidebar_state='collapsed')
 
@@ -169,6 +194,22 @@ def init_auth():
         st.session_state['username'] = ''
         st.session_state['user_role'] = 'viewer'
 
+    # Se não autenticado, tenta restaurar de token nos query params
+    if not st.session_state['authenticated']:
+        token = st.query_params.get('auth_token')
+        if token:
+            username = validar_token(token)
+            if username:
+                all_users = get_all_users()
+                if username in all_users:
+                    st.session_state['authenticated'] = True
+                    st.session_state['username'] = username
+                    st.session_state['user_role'] = all_users[username].get('role', 'viewer')
+                    logs_acesso.log_acesso(username, 'LOGIN_TOKEN', detalhes='Login restaurado por token')
+                    st.rerun()
+                else:
+                    del st.query_params['auth_token']
+
 def login_screen():
     st.markdown("""
     <style>
@@ -275,6 +316,7 @@ def login_screen():
                     save_all_users_to_file(users)
                 
                 logs_acesso.log_acesso(username, 'LOGIN', detalhes='Login realizado com sucesso')
+                st.query_params['auth_token'] = gerar_token(username)
                 st.rerun()
             else:
                 st.error('Usuário ou senha inválidos')
@@ -889,6 +931,8 @@ with st.sidebar:
             st.session_state['authenticated'] = False
             st.session_state['username'] = ''
             st.session_state['user_role'] = 'viewer'
+            if 'auth_token' in st.query_params:
+                del st.query_params['auth_token']
             st.rerun()
 
 is_admin = st.session_state.get('user_role') == 'admin'
