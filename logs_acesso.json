@@ -202,5 +202,107 @@
     "username": "admin",
     "acao": "LOGIN",
     "detalhes": "Login realizado com sucesso"
+  },
+  {
+    "timestamp": "2026-05-16T22:38:57.087529",
+    "username": "Lucas",
+    "acao": "LOGIN_FALHOU",
+    "detalhes": "Tentativa de login falhou"
+  },
+  {
+    "timestamp": "2026-05-16T22:38:57.685996",
+    "username": "Lucas",
+    "acao": "LOGIN_FALHOU",
+    "detalhes": "Tentativa de login falhou"
+  },
+  {
+    "timestamp": "2026-05-16T22:39:00.195345",
+    "username": "Lucas",
+    "acao": "LOGIN_FALHOU",
+    "detalhes": "Tentativa de login falhou"
+  },
+  {
+    "timestamp": "2026-05-16T22:39:01.725811",
+    "username": "desconhecido",
+    "acao": "LOGIN_FALHOU",
+    "detalhes": "Tentativa de login falhou"
+  },
+  {
+    "timestamp": "2026-05-16T22:39:01.953837",
+    "username": "desconhecido",
+    "acao": "LOGIN_FALHOU",
+    "detalhes": "Tentativa de login falhou"
+  },
+  {
+    "timestamp": "2026-05-16T22:39:02.110864",
+    "username": "desconhecido",
+    "acao": "LOGIN_FALHOU",
+    "detalhes": "Tentativa de login falhou"
+  },
+  {
+    "timestamp": "2026-05-16T22:39:02.257758",
+    "username": "desconhecido",
+    "acao": "LOGIN_FALHOU",
+    "detalhes": "Tentativa de login falhou"
+  },
+  {
+    "timestamp": "2026-05-16T22:41:13.836278",
+    "username": "Lucas",
+    "acao": "LOGIN_FALHOU",
+    "detalhes": "Tentativa de login falhou"
+  },
+  {
+    "timestamp": "2026-05-16T22:41:19.094709",
+    "username": "Lucas",
+    "acao": "LOGIN_FALHOU",
+    "detalhes": "Tentativa de login falhou"
+  },
+  {
+    "timestamp": "2026-05-16T22:41:20.239120",
+    "username": "Lucas",
+    "acao": "LOGIN_FALHOU",
+    "detalhes": "Tentativa de login falhou"
+  },
+  {
+    "timestamp": "2026-05-16T22:41:20.663940",
+    "username": "Lucas",
+    "acao": "LOGIN_FALHOU",
+    "detalhes": "Tentativa de login falhou"
+  },
+  {
+    "timestamp": "2026-05-16T22:41:20.825600",
+    "username": "Lucas",
+    "acao": "LOGIN_FALHOU",
+    "detalhes": "Tentativa de login falhou"
+  },
+  {
+    "timestamp": "2026-05-16T22:41:20.976614",
+    "username": "Lucas",
+    "acao": "LOGIN_FALHOU",
+    "detalhes": "Tentativa de login falhou"
+  },
+  {
+    "timestamp": "2026-05-16T22:41:23.288131",
+    "username": "Lucas",
+    "acao": "LOGIN_FALHOU",
+    "detalhes": "Tentativa de login falhou"
+  },
+  {
+    "timestamp": "2026-05-16T22:41:54.993811",
+    "username": "Admin",
+    "acao": "LOGIN_FALHOU",
+    "detalhes": "Tentativa de login falhou"
+  },
+  {
+    "timestamp": "2026-05-16T22:41:56.222808",
+    "username": "Admin",
+    "acao": "LOGIN_FALHOU",
+    "detalhes": "Tentativa de login falhou"
+  },
+  {
+    "timestamp": "2026-05-16T22:44:13.755184",
+    "username": "admin",
+    "acao": "LOGIN",
+    "detalhes": "Login realizado com sucesso"
   }
 ]

@@ -671,7 +671,41 @@ def arquivos_download_existentes() -> list[Path]:
 
 def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf):
     try:
+        from PIL import Image, ImageDraw, ImageFont
         import fitz
+        import io as io_module
+        
+        def chart_png_bytes(labels, values, title, width=620, max_items=15):
+            n = min(len(labels), max_items)
+            labels = labels[:n]
+            values = values[:n]
+            if not values:
+                return None
+            max_v = max(values)
+            bar_h = 24
+            pad = 12
+            title_h = 32
+            h = title_h + n * (bar_h + 6) + pad
+            img = Image.new('RGB', (width, h), (255, 255, 255))
+            draw = ImageDraw.Draw(img)
+            try:
+                font_t = ImageFont.truetype('arial.ttf', 13)
+                font_l = ImageFont.truetype('arial.ttf', 9)
+                font_v = ImageFont.truetype('arial.ttf', 9)
+            except Exception:
+                font_t = font_l = font_v = ImageFont.load_default()
+            draw.text((10, 6), title, fill=(20, 20, 40), font=font_t)
+            bar_area_w = width - 220
+            for i in range(n):
+                y = title_h + i * (bar_h + 6)
+                draw.text((8, y + 3), str(labels[i])[:28], fill=(60, 60, 80), font=font_l)
+                bw = int((values[i] / max_v) * bar_area_w) if max_v > 0 else 0
+                draw.rectangle([(170, y), (170 + max(bw, 2), y + bar_h)], fill=(37, 99, 235))
+                draw.text((170 + max(bw, 2) + 6, y + 3), moeda_br(values[i]), fill=(20, 20, 40), font=font_v)
+            buf = io_module.BytesIO()
+            img.save(buf, format='PNG')
+            return buf.getvalue()
+        
         doc = fitz.open()
         page = doc.new_page()
         y = 50
@@ -682,6 +716,15 @@ def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf):
                 y = 50
             page.insert_text((50, y), text, fontname='helv' if not bold else 'helvb', fontsize=size)
             y += size * 1.5
+        
+        def img_bytes(b):
+            nonlocal y
+            if y > 700:
+                page = doc.new_page()
+                y = 50
+            rect = fitz.Rect(40, y, 640, y + 260)
+            page.insert_image(rect, stream=b)
+            y += 270
         
         txt('RESUMO DA AUDITORIA', bold=True, size=18)
         txt(f'Gerado em: {datetime.now().strftime("%d/%m/%Y %H:%M")}', size=9)
@@ -700,34 +743,47 @@ def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf):
                 txt(' | '.join(vals), size=8)
             txt('')
         
-        # Categorias
-        if not df_cat.empty:
-            txt('CATEGORIAS', bold=True, size=14)
-            txt('')
-            top_cat = df_cat.groupby('Categoria', dropna=False)['Valor'].sum().sort_values(ascending=False).head(15)
-            for cat, val in top_cat.items():
-                txt(f'{str(cat)[:50]}: {moeda_br(val)}', size=9)
-            txt('')
+        # Categorias chart
+        if not df_cat.empty and 'Valor' in df_cat.columns:
+            grp = df_cat.groupby('Categoria', dropna=False)['Valor'].sum().sort_values(ascending=False).head(15)
+            if not grp.empty:
+                png = chart_png_bytes(list(grp.index), list(grp.values), 'Categorias — Top 15')
+                if png:
+                    img_bytes(png)
         
-        # Movimentações
-        if not df_mov.empty:
-            txt('MOVIMENTAÇÕES', bold=True, size=14)
+        # Movimentações chart
+        if not df_mov.empty and 'Valor_Real' in df_mov.columns:
+            grp = df_mov.groupby('Categoria', dropna=False)['Valor_Real'].sum().sort_values(ascending=False).head(12) if 'Categoria' in df_mov.columns else None
+            if grp is not None and not grp.empty:
+                png = chart_png_bytes(list(grp.index), list(grp.values), 'Movimentações por categoria')
+                if png:
+                    img_bytes(png)
             txt(f'Total de registros: {len(df_mov)}', size=9)
-            if 'Valor_Real' in df_mov.columns:
-                txt(f'Total movimentado: {moeda_br(df_mov["Valor_Real"].sum())}', size=9)
-            if SCORE_COL in df_mov.columns and df_mov[SCORE_COL].sum() > 0:
-                divg = df_mov[df_mov[SCORE_COL] > 0].sort_values(SCORE_COL, ascending=False).head(10)
-                txt(f'Divergências detectadas: {len(divg)}', bold=True, size=10)
-                for _, r in divg.iterrows():
-                    txt(f'  Score {int(r.get(SCORE_COL, 0))} | {str(r.get("Fornecedor", ""))[:40]} | {moeda_br(r.get("Valor_Real", 0))}', size=8)
+            txt(f'Total movimentado: {moeda_br(df_mov["Valor_Real"].sum())}', size=9)
             txt('')
         
-        # Cobranças
-        if not df_cob.empty:
-            txt('COBRANÇAS', bold=True, size=14)
+        # Divergências
+        if SCORE_COL in df_mov.columns and df_mov[SCORE_COL].sum() > 0:
+            divg = df_mov[df_mov[SCORE_COL] > 0].sort_values(SCORE_COL, ascending=False).head(10)
+            txt(f'DIVERGÊNCIAS ({len(divg)})', bold=True, size=14)
+            txt('')
+            if 'Fornecedor' in divg.columns and 'Valor_Real' in divg.columns:
+                png = chart_png_bytes(list(divg['Fornecedor'].astype(str)), list(divg['Valor_Real'].astype(float)), 'Divergências — Top 10')
+                if png:
+                    img_bytes(png)
+            for _, r in divg.iterrows():
+                txt(f'  Score {int(r.get(SCORE_COL, 0))} | {str(r.get("Fornecedor", ""))[:40]} | {moeda_br(r.get("Valor_Real", 0))}', size=8)
+            txt('')
+        
+        # Cobranças chart
+        if not df_cob.empty and 'Valor' in df_cob.columns:
+            if 'Bloco' in df_cob.columns:
+                grp = df_cob.groupby('Bloco', dropna=False)['Valor'].sum().sort_values(ascending=False)
+                png = chart_png_bytes(list(grp.index), list(grp.values), 'Cobranças por bloco')
+                if png:
+                    img_bytes(png)
             txt(f'Total: {len(df_cob)} registros', size=9)
-            if 'Valor' in df_cob.columns:
-                txt(f'Valor total: {moeda_br(df_cob["Valor"].sum())}', size=9)
+            txt(f'Valor total: {moeda_br(df_cob["Valor"].sum())}', size=9)
             txt('')
         
         # NFs
@@ -736,6 +792,12 @@ def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf):
             txt(f'Total vinculadas: {len(df_nf)}', size=9)
             if 'Valor_Real' in df_nf.columns:
                 txt(f'Valor total: {moeda_br(df_nf["Valor_Real"].sum())}', size=9)
+                if 'Fornecedor' in df_nf.columns:
+                    grp = df_nf.groupby('Fornecedor', dropna=False)['Valor_Real'].sum().sort_values(ascending=False).head(12)
+                    if not grp.empty:
+                        png = chart_png_bytes(list(grp.index), list(grp.values), 'NFs por fornecedor')
+                        if png:
+                            img_bytes(png)
             txt('')
         
         pdf_bytes = doc.write()
@@ -1388,19 +1450,6 @@ with aba_mov:
     if df_mov_f.empty:
         st.info('Nenhuma movimentação encontrada para o filtro atual.')
     else:
-        if {'Mes_Ano', 'Conta', 'Tipo_Movimento', 'Valor_Entrada', 'Valor_Saida', 'Valor_Transferencia'}.issubset(df_mov_f.columns):
-            grp_all = df_mov_f.groupby(['Mes_Ano', 'Conta', 'Tipo_Movimento'], dropna=False)[['Valor_Entrada', 'Valor_Saida', 'Valor_Transferencia']].sum().reset_index()
-            grp_all['Valor'] = grp_all.apply(lambda row: row['Valor_Entrada'] if row['Tipo_Movimento'] == 'Entrada' else (row['Valor_Saida'] if row['Tipo_Movimento'] == 'Saída' else row['Valor_Transferencia']), axis=1)
-            contas = sorted(grp_all['Conta'].dropna().astype(str).unique().tolist())
-            contas_sel = st.multiselect('Filtrar contas', contas, default=[], key='contas_mov_chart', placeholder='Todas as contas')
-            contas_filtro = contas_sel if contas_sel else contas
-            grp = grp_all[grp_all['Conta'].astype(str).isin(contas_filtro)]
-            n_contas = len(contas_filtro)
-            st.markdown('<br>', unsafe_allow_html=True)
-            fig = px.bar(grp, x='Mes_Ano', y='Valor', color='Tipo_Movimento', facet_col='Conta', facet_col_wrap=min(3, n_contas), height=260 * ((n_contas - 1) // 3 + 2), title='Movimentação analítica por conta', color_discrete_map={'Entrada': COR_ENTRADA, 'Saída': COR_SAIDA, 'Transferência': COR_TRANSFERENCIA})
-            formatar_fig(fig, height=260 * ((n_contas - 1) // 3 + 2), moeda=True)
-            st.plotly_chart(fig, width='stretch')
-        
         if {'Categoria'}.issubset(df_mov_f.columns):
             cats = ['Todos'] + sorted(df_mov_f['Categoria'].dropna().astype(str).unique().tolist())
             cat_sel = st.selectbox('Detalhar categoria/despesa (ex.: obra, manutenção, serviços)', cats)
@@ -1449,17 +1498,34 @@ with aba_mov:
             if st.button(f'Mostrar mais {step} itens ({rest} restantes)', key='mov_mostrar_mais', use_container_width=True):
                 st.session_state['mov_limit'] += step
                 st.rerun()
+        
+        st.markdown('<br>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title" style="margin-top:2.5rem">Movimentação Analítica por Conta</div>', unsafe_allow_html=True)
+        if {'Mes_Ano', 'Conta', 'Tipo_Movimento', 'Valor_Entrada', 'Valor_Saida', 'Valor_Transferencia'}.issubset(df_mov_f.columns):
+            grp_all = df_mov_f.groupby(['Mes_Ano', 'Conta', 'Tipo_Movimento'], dropna=False)[['Valor_Entrada', 'Valor_Saida', 'Valor_Transferencia']].sum().reset_index()
+            grp_all['Valor'] = grp_all.apply(lambda row: row['Valor_Entrada'] if row['Tipo_Movimento'] == 'Entrada' else (row['Valor_Saida'] if row['Tipo_Movimento'] == 'Saída' else row['Valor_Transferencia']), axis=1)
+            contas = sorted(grp_all['Conta'].dropna().astype(str).unique().tolist())
+            contas_sel = st.multiselect('Filtrar contas', contas, default=[], key='contas_mov_chart', placeholder='Todas as contas')
+            contas_filtro = contas_sel if contas_sel else contas
+            grp = grp_all[grp_all['Conta'].astype(str).isin(contas_filtro)]
+            n_contas = len(contas_filtro)
+            fig = px.bar(grp, x='Mes_Ano', y='Valor', color='Tipo_Movimento', facet_col='Conta', facet_col_wrap=min(3, n_contas), height=260 * ((n_contas - 1) // 3 + 2), title='Movimentação analítica por conta', color_discrete_map={'Entrada': COR_ENTRADA, 'Saída': COR_SAIDA, 'Transferência': COR_TRANSFERENCIA})
+            formatar_fig(fig, height=260 * ((n_contas - 1) // 3 + 2), moeda=True)
+            st.plotly_chart(fig, width='stretch')
 
 with aba_cob:
     st.markdown('<div class="section-title">Composição das Cobranças</div>', unsafe_allow_html=True)
-    if not df_cob_f.empty and {'Bloco', 'Valor'}.issubset(df_cob_f.columns):
-        fig = px.bar(df_cob_f.groupby('Bloco', dropna=False)['Valor'].sum().reset_index(), x='Bloco', y='Valor', height=420, title='Valor por bloco', color_discrete_sequence=[COR_CIANO])
-        formatar_fig(fig, height=420, moeda=True)
-        st.plotly_chart(fig, width='stretch')
-    try:
-        st.dataframe(sanitizar_arrow(preparar_exibicao(df_cob_f)), width='stretch', hide_index=True)
-    except Exception:
-        st.table(preparar_exibicao(df_cob_f).astype(str).head(50))
+    if df_cob_f.empty:
+        st.info('Nenhum registro de cobrança disponível. Execute a auditoria pelo painel **Admin** para gerar os dados de composição das cobranças.')
+    else:
+        if {'Bloco', 'Valor'}.issubset(df_cob_f.columns):
+            fig = px.bar(df_cob_f.groupby('Bloco', dropna=False)['Valor'].sum().reset_index(), x='Bloco', y='Valor', height=420, title='Valor por bloco', color_discrete_sequence=[COR_CIANO])
+            formatar_fig(fig, height=420, moeda=True)
+            st.plotly_chart(fig, width='stretch')
+        try:
+            st.dataframe(sanitizar_arrow(preparar_exibicao(df_cob_f)), width='stretch', hide_index=True)
+        except Exception:
+            st.table(preparar_exibicao(df_cob_f).astype(str).head(50))
 with aba_dash:
     st.markdown('<div class="section-title">Dashboards HTML do motor</div>', unsafe_allow_html=True)
     dashs = dashboards_existentes()
