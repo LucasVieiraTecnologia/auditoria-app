@@ -1249,14 +1249,14 @@ with aba_cat:
         colunas_nf = [c for c in ['Data', 'Fornecedor', 'Descricao', 'Valor_Real', 'Numero_NF', 'Chave_NF', 'Status_Consulta_NF', 'Link_Consulta_NF', 'Link_Origem_NF', 'Arquivo_NF_Baixado', 'Link_NF'] if c in df_nf_f.columns]
         df_display = preparar_exibicao(df_nf_f[colunas_nf]).copy()
         
-        # Sanitize: replace inf/-inf with None (Arrow can't handle them)
-        df_display = df_display.replace([float('inf'), float('-inf')], None)
+        # Sanitize: replace inf/-inf with NaN (Arrow can't handle inf)
+        df_display = df_display.replace([float('inf'), float('-inf')], float('nan'))
         
-        # Ensure link columns contain only strings or None
+        # Ensure link columns contain only strings
         for col in ['Link_Consulta_NF', 'Link_Origem_NF']:
             if col in df_display.columns:
                 df_display[col] = df_display[col].apply(
-                    lambda x: str(x) if pd.notna(x) and str(x).strip() != '' else None
+                    lambda x: str(x).strip() if pd.notna(x) and str(x).strip() != '' else ''
                 )
         
         try:
@@ -1273,9 +1273,9 @@ with aba_cat:
         except Exception as e:
             st.error(f"Erro ao exibir tabela interativa: {str(e)}")
             try:
-                st.dataframe(df_display, width='stretch', hide_index=True)
+                st.dataframe(df_display.fillna('').astype(str), width='stretch', hide_index=True)
             except Exception:
-                st.table(df_display.astype(str).head(50))
+                st.table(df_display.fillna('').astype(str).head(50))
 
         imagens = [p for p in df_nf_f['Link_NF'].dropna().astype(str).unique().tolist() if Path(p).exists()] if 'Link_NF' in df_nf_f.columns else []
         if imagens:
