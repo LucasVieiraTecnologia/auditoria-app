@@ -428,6 +428,22 @@ def preparar_exibicao(df: pd.DataFrame) -> pd.DataFrame:
         return df
     return df.rename(columns={origem: destino for origem, destino in COLUNAS_EXIBICAO.items() if origem in df.columns})
 
+def sanitizar_arrow(df: pd.DataFrame) -> pd.DataFrame:
+    """Sanitiza DataFrame para evitar erros de conversão Arrow (inf, NaN, ints grandes)"""
+    if df.empty:
+        return df
+    out = df.copy()
+    for col in out.columns:
+        if out[col].dtype.kind in 'fc':
+            out[col] = out[col].replace([float('inf'), float('-inf')], float('nan'))
+        if out[col].dtype.kind == 'i':
+            try:
+                if not out[col].empty and (out[col].max() > 2**53 or out[col].min() < -(2**53)):
+                    out[col] = out[col].astype(float)
+            except Exception:
+                out[col] = out[col].astype(float)
+    return out
+
 def gerar_link_verificacao_nf(chave_nf: str, numero_nf: str = '', tipo: str = '') -> tuple[str, str]:
     if chave_nf and len(chave_nf) >= 44:
         url = f'https://www.nfe.fazenda.gov.br/portal/consultaRecaptcha.aspx?tipoConteudo=XbSeqxE8pl8=&chaveAcesso={chave_nf[:44]}'
@@ -1160,7 +1176,7 @@ with aba_ia:
 with aba_balanco:
     st.markdown('<div class="section-title">Balanço Mensal Consolidado</div>', unsafe_allow_html=True)
     try:
-        st.dataframe(preparar_exibicao(df_bal_f), width='stretch', hide_index=True)
+        st.dataframe(sanitizar_arrow(preparar_exibicao(df_bal_f)), width='stretch', hide_index=True)
     except Exception:
         st.table(preparar_exibicao(df_bal_f).astype(str).head(50))
 with aba_cat:
@@ -1170,7 +1186,7 @@ with aba_cat:
         formatar_fig(fig, height=520, moeda=True)
         st.plotly_chart(fig, width='stretch')
     try:
-        st.dataframe(preparar_exibicao(df_cat_f), width='stretch', hide_index=True)
+        st.dataframe(sanitizar_arrow(preparar_exibicao(df_cat_f)), width='stretch', hide_index=True)
     except Exception:
         st.table(preparar_exibicao(df_cat_f).astype(str).head(50))
 
@@ -1194,9 +1210,16 @@ with aba_nf:
             st.plotly_chart(fig, width='stretch')
 
         df_nf_view = df_nf_f.reset_index(drop=True).copy()
-        df_nf_view['Item'] = df_nf_view.apply(lambda row: f"{row.get('Data', '')} | {row.get('Fornecedor', 'Sem fornecedor') or 'Sem fornecedor'} | {moeda_br(row.get('Valor_Real', 0))} | {str(row.get('Descricao', ''))[:80]}", axis=1)
-        item_sel = st.selectbox('Clique/escolha uma nota ou despesa para abrir os detalhes', df_nf_view['Item'].tolist(), index=0)
-        row_sel = df_nf_view[df_nf_view['Item'] == item_sel].iloc[0]
+        df_nf_view['_forn'] = df_nf_view.get('Fornecedor', pd.Series(['']*len(df_nf_view))).apply(lambda x: str(x).strip() if pd.notna(x) and str(x).strip() != '' else 'Sem fornecedor')
+        df_nf_view['_desc'] = df_nf_view.get('Descricao', pd.Series(['']*len(df_nf_view))).apply(lambda x: str(x).strip() if pd.notna(x) else '')
+        df_nf_view['Item'] = df_nf_view.apply(lambda row: f"{row.get('Data', '')} | {row['_forn']} | {moeda_br(row.get('Valor_Real', 0))} | {row['_desc'][:80]}", axis=1)
+        
+        busca = st.text_input('🔍 Buscar nota/despesa', placeholder='Filtrar por fornecedor, descrição ou valor...')
+        itens_filtrados = [i for i in df_nf_view['Item'].tolist() if busca.lower() in i.lower()] if busca else df_nf_view['Item'].tolist()
+        item_sel = st.selectbox('Clique/escolha uma nota ou despesa para abrir os detalhes', itens_filtrados if itens_filtrados else ['Nenhum resultado'], index=0)
+        if not itens_filtrados:
+            st.info('Nenhum item encontrado para essa busca.')
+        row_sel = df_nf_view[df_nf_view['Item'] == item_sel].iloc[0] if itens_filtrados else df_nf_view.iloc[0]
         detalhe_ctx = st.popover('Abrir imagem e dados da nota', use_container_width=True) if hasattr(st, 'popover') else st.expander('Abrir imagem e dados da nota', expanded=True)
         with detalhe_ctx:
             d1, d2 = st.columns([1.1, 1])
@@ -1250,9 +1273,7 @@ with aba_nf:
 
         colunas_nf = [c for c in ['Data', 'Fornecedor', 'Descricao', 'Valor_Real', 'Numero_NF', 'Chave_NF', 'Status_Consulta_NF', 'Link_Consulta_NF', 'Link_Origem_NF', 'Arquivo_NF_Baixado', 'Link_NF'] if c in df_nf_f.columns]
         df_display = preparar_exibicao(df_nf_f[colunas_nf]).copy()
-        
-        # Sanitize: replace inf/-inf with NaN (Arrow can't handle inf)
-        df_display = df_display.replace([float('inf'), float('-inf')], float('nan'))
+        df_display = sanitizar_arrow(df_display)
         
         # Ensure link columns contain only strings
         for col in ['Link_Consulta_NF', 'Link_Origem_NF']:
@@ -1302,7 +1323,7 @@ with aba_mov:
             cat_sel = st.selectbox('Detalhar categoria/despesa (ex.: obra, manutenção, serviços)', categorias_detalhe)
             detalhes = saidas_detalhe[saidas_detalhe['Categoria'].astype(str) == cat_sel].sort_values('Valor_Real', ascending=False).head(30)
             try:
-                st.dataframe(preparar_exibicao(detalhes), width='stretch', hide_index=True)
+                st.dataframe(sanitizar_arrow(preparar_exibicao(detalhes)), width='stretch', hide_index=True)
             except Exception:
                 st.table(preparar_exibicao(detalhes).astype(str).head(50))
             if 'Link_NF' in detalhes.columns:
@@ -1314,7 +1335,7 @@ with aba_mov:
                             with cols[i % 3]:
                                 st.image(img, caption=Path(img).name, width='stretch')
     try:
-        st.dataframe(preparar_exibicao(df_mov_f), width='stretch', hide_index=True)
+        st.dataframe(sanitizar_arrow(preparar_exibicao(df_mov_f)), width='stretch', hide_index=True)
     except Exception:
         st.table(preparar_exibicao(df_mov_f).astype(str).head(50))
 with aba_cob:
@@ -1324,7 +1345,7 @@ with aba_cob:
         formatar_fig(fig, height=420, moeda=True)
         st.plotly_chart(fig, width='stretch')
     try:
-        st.dataframe(preparar_exibicao(df_cob_f), width='stretch', hide_index=True)
+        st.dataframe(sanitizar_arrow(preparar_exibicao(df_cob_f)), width='stretch', hide_index=True)
     except Exception:
         st.table(preparar_exibicao(df_cob_f).astype(str).head(50))
 with aba_dash:
