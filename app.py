@@ -707,7 +707,7 @@ def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf, prog=None, secoes=No
             if y > 760:
                 page = doc.new_page()
                 y = 50
-            page.insert_text((50, y), text, fontname='helv' if not bold else 'helvb', fontsize=size)
+            page.insert_text((50, y), text, fontname='Helvetica' if not bold else 'Helvetica-Bold', fontsize=size)
             y += size * 1.5
         
         def img_bytes(b):
