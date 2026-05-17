@@ -9,6 +9,7 @@ import re
 import hashlib
 import shutil
 import traceback
+import base64
 import bcrypt
 from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
@@ -239,64 +240,85 @@ def init_auth():
 def login_screen():
     st.markdown("""
     <style>
+    /* Full-screen background video */
+    .stApp {
+        position: relative;
+        overflow: hidden;
+    }
+    
+    /* Background video container */
+    .video-background {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: -1;
+        opacity: 0.7;
+    }
+    
+    /* Overlay to darken video and improve text readability */
+    .video-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: -1;
+    }
+    
+    /* Login container - centered on screen */
     .login-container {
-        display: flex;
-        height: 100vh;
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 20px;
-        align-items: center;
-    }
-    .login-video {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 20px;
-    }
-    .login-form-container {
-        flex: 1;
+        position: relative;
+        z-index: 1;
         max-width: 400px;
         margin: 0 auto;
-        padding: 40px;
-        background: white;
-        border-radius: 16px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+        padding: 40px 20px;
+        text-align: center;
+        color: white;
     }
+    
     .login-title {
-        color: #2563eb;
+        color: #ffffff;
         font-size: 28px;
         font-weight: 800;
         margin-bottom: 24px;
-        text-align: center;
-        letter-spacing: -0.5px;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
+    
     .login-subtitle {
-        color: #64748b;
+        color: #e2e8f0;
         font-size: 16px;
-        text-align: center;
         margin-bottom: 32px;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.2);
     }
-    .login-error {
-        color: #dc2626;
-        background: #fee2e2;
-        padding: 12px;
-        border-radius: 8px;
-        margin-top: 16px;
-        text-align: center;
-        font-size: 14px;
+    
+    /* Form styling */
+    .login-form {
+        background: rgba(255, 255, 255, 0.9);
+        padding: 32px;
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        backdrop-filter: blur(10px);
     }
+    
     .stTextInput > div > div > input {
         border-radius: 10px;
         border: 2px solid #e2e8f0;
         padding: 12px 16px;
         font-size: 16px;
         transition: all 0.3s ease;
+        background: rgba(255,255,255,0.8);
     }
+    
     .stTextInput > div > div > input:focus {
         border-color: #2563eb;
         box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        background: white;
     }
+    
     .stButton > button {
         width: 100%;
         border-radius: 12px;
@@ -309,89 +331,121 @@ def login_screen():
         transition: all 0.3s ease;
         box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
     }
+    
     .stButton > button:hover {
         transform: translateY(-2px);
         box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
         background: linear-gradient(135deg, #1d4ed8, #1e40af);
     }
+    
     .stButton > button:active {
         transform: translateY(0);
     }
+    
+    .login-error {
+        color: #dc2626;
+        background: #fee2e2;
+        padding: 12px;
+        border-radius: 8px;
+        margin-top: 16px;
+        text-align: center;
+        font-size: 14px;
+    }
+    
+    /* Responsive design */
     @media (max-width: 768px) {
         .login-container {
-            flex-direction: column;
-            height: auto;
+            padding: 20px;
         }
-        .login-video {
-            margin-bottom: 32px;
+        .login-form {
+            padding: 24px;
         }
-        .login-form-container {
-            margin: 0 20px;
+        .login-title {
+            font-size: 24px;
         }
     }
     </style>
     """, unsafe_allow_html=True)
     
-    # Create columns for video and form
-    col1, col2 = st.columns([1, 1])
-    
-    with col1:
-        # Display video
-        try:
-            video_file = open('img/Candelaria.mp4', 'rb')
-            video_bytes = video_file.read()
-            st.video(video_bytes)
-        except FileNotFoundError:
-            st.markdown("""
-            <div style="text-align: center; padding: 40px; color: #64748b;">
-                <div style="font-size: 48px; margin-bottom: 16px;">🎥</div>
-                <div>Vídeo Candelaria não encontrado</div>
-                <div style="font-size: 14px; margin-top: 8px;">Verifique se o arquivo está em img/Candelaria.mp4</div>
-            </div>
-            """, unsafe_allow_html=True)
-        except Exception as e:
-            st.markdown(f"""
-            <div style="text-align: center; padding: 40px; color: #dc2626;">
-                <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
-                <div>Erro ao carregar vídeo</div>
-                <div style="font-size: 14px; margin-top: 8px;">{str(e)}</div>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown('<div class="login-form-container">', unsafe_allow_html=True)
-        st.markdown('<div class="login-title">🏢 Auditoria Inteligente</div>', unsafe_allow_html=True)
-        st.markdown('<div class="login-subtitle">Sistema de gestão condominial avançado</div>', unsafe_allow_html=True)
+    # Background video
+    try:
+        video_file = open('img/Candelaria.mp4', 'rb')
+        video_bytes = video_file.read()
+        st.markdown(
+            f'''
+            <video autoplay muted loop playsinline style="width: 100%; height: 100%; object-fit: cover; position: fixed; top: 0; left: 0; z-index: -2;" 
+                   playbackRate="0.5">
+                <source src="data:video/mp4;base64,{base64.b64encode(video_bytes).decode()}" type="video/mp4">
+            </video>
+            ''',
+            unsafe_allow_html=True
+        )
         
-        with st.form('login_form'):
-            username = st.text_input('Usuário', placeholder='Digite seu usuário')
-            password = st.text_input('Senha', type='password', placeholder='Digite sua senha')
-            submitted = st.form_submit_button('Entrar', use_container_width=True)
-            
-            if submitted:
-                if check_credentials(username, password):
-                    st.session_state['authenticated'] = True
-                    st.session_state['username'] = username
-                    st.session_state['user_role'] = 'admin' if username == os.getenv('APP_USERNAME', 'admin') else 'viewer'
-                    
-                    # Update user login info
-                    users = get_all_users()
-                    if username in users:
-                        users[username]['last_login'] = datetime.now().isoformat()
-                        users[username]['last_seen'] = datetime.now().isoformat()
-                        save_all_users_to_file(users)
-                    
+        # Dark overlay for better text readability
+        st.markdown(
+            '''
+            <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); z-index: -1;"></div>
+            ''',
+            unsafe_allow_html=True
+        )
+    except FileNotFoundError:
+        # Fallback to gradient background if video not found
+        st.markdown("""
+        <style>
+        .stApp {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        st.warning("Vídeo Candelaria não encontrado. Usando fundo degradê como fallback.")
+    except Exception as e:
+        # Fallback to gradient background on error
+        st.markdown("""
+        <style>
+        .stApp {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        st.error(f"Erro ao carregar vídeo: {str(e)}. Usando fundo degradê como fallback.")
+    
+    # Login form container
+    st.markdown('<div class="login-container">', unsafe_allow_html=True)
+    st.markdown('<div class="login-title">🏢 Auditoria Inteligente</div>', unsafe_allow_html=True)
+    st.markdown('<div class="login-subtitle">Sistema de gestão condominial avançado</div>', unsafe_allow_html=True)
+    
+    st.markdown('<div class="login-form">', unsafe_allow_html=True)
+    
+    with st.form('login_form'):
+        username = st.text_input('Usuário', placeholder='Digite seu usuário')
+        password = st.text_input('Senha', type='password', placeholder='Digite sua senha')
+        submitted = st.form_submit_button('Entrar', use_container_width=True)
+        
+        if submitted:
+            if check_credentials(username, password):
+                st.session_state['authenticated'] = True
+                st.session_state['username'] = username
+                st.session_state['user_role'] = 'admin' if username == os.getenv('APP_USERNAME', 'admin') else 'viewer'
+                
+                # Update user login info
+                users = get_all_users()
+                if username in users:
+                    users[username]['last_login'] = datetime.now().isoformat()
+                    users[username]['last_seen'] = datetime.now().isoformat()
+                    save_all_users_to_file(users)
+                
                 # Set cookies for persistent login (valid for 7 days)
                 st.query_params.auth = 'true'
                 st.query_params.user = username
-                    
-                    logs_acesso.log_acesso(username, 'LOGIN', detalhes='Login realizado com sucesso')
-                    st.rerun()
-                else:
-                    st.markdown('<div class="login-error">Usuário ou senha inválidos</div>', unsafe_allow_html=True)
-                    logs_acesso.log_acesso(username or 'desconhecido', 'LOGIN_FALHOU', detalhes='Tentativa de login falhou')
-        
-        st.markdown('</div>', unsafe_allow_html=True)
+                
+                logs_acesso.log_acesso(username, 'LOGIN', detalhes='Login realizado com sucesso')
+                st.rerun()
+            else:
+                st.markdown('<div class="login-error">Usuário ou senha inválidos</div>', unsafe_allow_html=True)
+                logs_acesso.log_acesso(username or 'desconhecido', 'LOGIN_FALHOU', detalhes='Tentativa de login falhou')
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
     
     st.stop()
 
