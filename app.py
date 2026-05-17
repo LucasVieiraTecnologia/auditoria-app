@@ -1100,6 +1100,83 @@ tabs = st.tabs(tab_labels)
 aba_exec, aba_ia, aba_balanco, aba_cat, aba_nf, aba_mov, aba_cob, aba_dash, aba_dl = tabs
 
 with aba_exec:
+    if st.button('📄 Baixar PDF dos gráficos', key='pdf_executivo', use_container_width=True):
+        try:
+            import plotly.io as pio
+            import fitz
+            exec_figs = []
+            exec_figs.append(None)  # placeholder for chart 1
+            if not df_bal_f.empty and 'Mes_Ano' in df_bal_f.columns:
+                bal_plot = df_bal_f[['Mes_Ano', 'Total_Receitas', 'Total_Despesas', 'Movimento_Liquido']].copy().sort_values('Mes_Ano')
+                fig0 = go.Figure()
+                fig0.add_trace(go.Bar(name='Receitas', x=bal_plot['Mes_Ano'], y=bal_plot['Total_Receitas'], marker_color='#22c55e'))
+                fig0.add_trace(go.Bar(name='Despesas', x=bal_plot['Mes_Ano'], y=bal_plot['Total_Despesas'], marker_color='#ef4444'))
+                fig0.add_trace(go.Scatter(name='Resultado', x=bal_plot['Mes_Ano'], y=bal_plot['Movimento_Liquido'], mode='lines+markers', line=dict(color='#2563eb', width=4)))
+                formatar_fig(fig0, height=470, moeda=True)
+                fig0.update_layout(barmode='group')
+                exec_figs[0] = fig0
+            if not df_bal_f.empty and 'Mes_Ano' in df_bal_f.columns:
+                fig1 = go.Figure()
+                if 'Saldo_Anterior' in df_bal_f.columns:
+                    fig1.add_trace(go.Scatter(name='Saldo anterior', x=df_bal_f['Mes_Ano'], y=df_bal_f['Saldo_Anterior'], mode='lines+markers', line=dict(color='#94a3b8', width=3)))
+                if 'Saldo_Final' in df_bal_f.columns:
+                    fig1.add_trace(go.Scatter(name='Saldo final', x=df_bal_f['Mes_Ano'], y=df_bal_f['Saldo_Final'], mode='lines+markers', line=dict(color='#0ea5e9', width=4)))
+                formatar_fig(fig1, height=470, moeda=True)
+                exec_figs.append(fig1)
+            if not df_cat_f.empty:
+                fig2 = px.treemap(df_cat_f, path=[px.Constant('Categorias'), 'Grupo', 'Categoria'], values='Valor', color='Grupo', color_discrete_map={'Entrada': COR_ENTRADA, 'Saída': COR_SAIDA}, height=540)
+                formatar_fig(fig2, height=540)
+                exec_figs.append(fig2)
+            if not df_mov_f.empty and 'Tipo_Movimento' in df_mov_f.columns:
+                resumo_tipos = df_mov_f.groupby('Tipo_Movimento', dropna=False)[['Valor_Entrada', 'Valor_Saida', 'Valor_Transferencia']].sum().reset_index()
+                resumo_tipos['Valor'] = resumo_tipos.apply(lambda row: row['Valor_Entrada'] if row['Tipo_Movimento'] == 'Entrada' else (row['Valor_Saida'] if row['Tipo_Movimento'] == 'Saída' else row['Valor_Transferencia']), axis=1)
+                fig3 = px.pie(resumo_tipos, names='Tipo_Movimento', values='Valor', hole=0.62, color='Tipo_Movimento', color_discrete_map={'Entrada': COR_ENTRADA, 'Saída': COR_SAIDA, 'Transferência': COR_TRANSFERENCIA}, height=540)
+                fig3.update_traces(textposition='inside', textinfo='percent+label', marker=dict(line=dict(color='white', width=2)))
+                formatar_fig(fig3, height=540)
+                exec_figs.append(fig3)
+            if not df_mov_f.empty and 'Tipo_Movimento' in df_mov_f.columns:
+                top_saida = df_mov_f[df_mov_f['Tipo_Movimento'] == 'Saída'].groupby('Fornecedor', dropna=False)['Valor_Saida'].sum().reset_index().sort_values('Valor_Saida', ascending=False).head(12)
+                if not top_saida.empty:
+                    fig4 = px.funnel(top_saida, x='Valor_Saida', y='Fornecedor', height=520, color_discrete_sequence=[COR_SAIDA])
+                    formatar_fig(fig4, height=520, moeda=True)
+                    exec_figs.append(fig4)
+            if not df_cat_f.empty and {'Mes_Ano', 'Categoria', 'Valor_Saida'}.issubset(df_cat_f.columns):
+                heat = df_cat_f.groupby(['Categoria', 'Mes_Ano'], dropna=False)['Valor_Saida'].sum().reset_index()
+                if not heat.empty:
+                    piv = heat.pivot(index='Categoria', columns='Mes_Ano', values='Valor_Saida').fillna(0)
+                    fig5 = px.imshow(piv, aspect='auto', color_continuous_scale='Tealgrn', height=520, labels={'x': 'Mês', 'y': 'Categoria', 'color': 'Saídas'})
+                    formatar_fig(fig5, height=520)
+                    exec_figs.append(fig5)
+            if not df_mov_f.empty and {SCORE_COL, 'Conta', 'Tipo_Movimento'}.issubset(df_mov_f.columns):
+                divergencias = df_mov_f[df_mov_f['Tipo_Movimento'] == 'Saída'].copy()
+                if not divergencias.empty:
+                    divergencias_plot = preparar_exibicao(divergencias)
+                    hover_cols = [c for c in ['Data', 'Fornecedor', 'Descricao', 'Motivo_Divergencia'] if c in divergencias_plot.columns]
+                    fig6 = px.scatter(divergencias_plot, x='Score_Divergencia', y='Valor_Real', color='Conta' if 'Conta' in divergencias_plot.columns else None, hover_data=hover_cols, height=520, size='Valor_Real' if 'Valor_Real' in divergencias_plot.columns else None, color_discrete_sequence=px.colors.qualitative.Safe)
+                    fig6.update_traces(marker=dict(opacity=.82, line=dict(width=1, color='white')))
+                    formatar_fig(fig6, height=520, moeda=True)
+                    exec_figs.append(fig6)
+            if not df_mov_f.empty and {'Conta', 'Tipo_Movimento', 'Valor_Entrada', 'Valor_Saida', 'Valor_Transferencia'}.issubset(df_mov_f.columns):
+                grp = df_mov_f.groupby(['Conta', 'Tipo_Movimento'], dropna=False)[['Valor_Entrada', 'Valor_Saida', 'Valor_Transferencia']].sum().reset_index()
+                grp['Valor'] = grp.apply(lambda row: row['Valor_Entrada'] if row['Tipo_Movimento'] == 'Entrada' else (row['Valor_Saida'] if row['Tipo_Movimento'] == 'Saída' else row['Valor_Transferencia']), axis=1)
+                fig7 = px.sunburst(grp, path=[px.Constant('Contas'), 'Conta', 'Tipo_Movimento'], values='Valor', height=520, color='Tipo_Movimento', color_discrete_map={'Entrada': COR_ENTRADA, 'Saída': COR_SAIDA, 'Transferência': COR_TRANSFERENCIA})
+                formatar_fig(fig7, height=520)
+                exec_figs.append(fig7)
+            imgs = []
+            for f in exec_figs:
+                if f is not None:
+                    imgs.append(pio.to_image(f, format='png', width=1200, height=800, scale=2))
+            if imgs:
+                doc = fitz.open()
+                for img_bytes in imgs:
+                    page = doc.new_page(width=1200, height=800)
+                    rect = fitz.Rect(0, 0, 1200, 800)
+                    page.insert_image(rect, stream=img_bytes)
+                pdf_data = doc.write()
+                doc.close()
+                st.download_button('📥 Salvar PDF', data=pdf_data, file_name='visao_executiva.pdf', mime='application/pdf', use_container_width=True)
+        except Exception as e:
+            st.error(f'Erro ao gerar PDF: {e}')
     r1c1, r1c2 = st.columns(2)
     with r1c1:
         with st.container(border=True):
