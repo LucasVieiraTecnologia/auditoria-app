@@ -1017,16 +1017,20 @@ with aba_ia:
 
 with aba_balanco:
     st.markdown('<div class="section-title">Balanço Mensal Consolidado</div>', unsafe_allow_html=True)
-    st.dataframe(preparar_exibicao(df_bal_f), width='stretch', hide_index=True)
+    try:
+        st.dataframe(preparar_exibicao(df_bal_f), width='stretch', hide_index=True)
+    except Exception:
+        st.table(preparar_exibicao(df_bal_f).astype(str).head(50))
 with aba_cat:
     st.markdown('<div class="section-title">Categorias Mensais</div>', unsafe_allow_html=True)
     if not df_cat_f.empty:
         fig = px.bar(df_cat_f.groupby(['Categoria', 'Grupo'], dropna=False)['Valor'].sum().reset_index().sort_values('Valor', ascending=False).head(20), x='Valor', y='Categoria', color='Grupo', orientation='h', height=520, title='Top categorias', color_discrete_map={'Entrada': COR_ENTRADA, 'Saída': COR_SAIDA})
         formatar_fig(fig, height=520, moeda=True)
         st.plotly_chart(fig, width='stretch')
-    st.dataframe(preparar_exibicao(df_cat_f), width='stretch', hide_index=True)
-
-with aba_nf:
+    try:
+        st.dataframe(preparar_exibicao(df_cat_f), width='stretch', hide_index=True)
+    except Exception:
+        st.table(preparar_exibicao(df_cat_f).astype(str).head(50))
     st.markdown('<div class="section-title">Notas fiscais e comprovantes vinculados</div><div class="section-sub">Imagens extraídas dos PDFs, número da nota, chave de acesso, status da consulta e vínculo por valor com a movimentação.</div>', unsafe_allow_html=True)
     if df_nf_f.empty:
         st.info('Nenhuma nota fiscal ou comprovante foi vinculado às movimentações filtradas ainda.')
@@ -1125,9 +1129,11 @@ with aba_nf:
                 },
             )
         except Exception as e:
-            # Fallback to regular dataframe if Arrow conversion fails
             st.error(f"Erro ao exibir tabela interativa: {str(e)}")
-            st.dataframe(df_display, width='stretch', hide_index=True)
+            try:
+                st.dataframe(df_display, width='stretch', hide_index=True)
+            except Exception:
+                st.table(df_display.astype(str).head(50))
 
         imagens = [p for p in df_nf_f['Link_NF'].dropna().astype(str).unique().tolist() if Path(p).exists()] if 'Link_NF' in df_nf_f.columns else []
         if imagens:
@@ -1151,7 +1157,10 @@ with aba_mov:
         if categorias_detalhe:
             cat_sel = st.selectbox('Detalhar categoria/despesa (ex.: obra, manutenção, serviços)', categorias_detalhe)
             detalhes = saidas_detalhe[saidas_detalhe['Categoria'].astype(str) == cat_sel].sort_values('Valor_Real', ascending=False).head(30)
-            st.dataframe(preparar_exibicao(detalhes), width='stretch', hide_index=True)
+            try:
+                st.dataframe(preparar_exibicao(detalhes), width='stretch', hide_index=True)
+            except Exception:
+                st.table(preparar_exibicao(detalhes).astype(str).head(50))
             if 'Link_NF' in detalhes.columns:
                 imgs = [p for p in detalhes['Link_NF'].dropna().astype(str).tolist() if p and Path(p).exists()]
                 if imgs:
@@ -1160,14 +1169,20 @@ with aba_mov:
                         for i, img in enumerate(imgs[:9]):
                             with cols[i % 3]:
                                 st.image(img, caption=Path(img).name, width='stretch')
-    st.dataframe(preparar_exibicao(df_mov_f), width='stretch', hide_index=True)
+    try:
+        st.dataframe(preparar_exibicao(df_mov_f), width='stretch', hide_index=True)
+    except Exception:
+        st.table(preparar_exibicao(df_mov_f).astype(str).head(50))
 with aba_cob:
     st.markdown('<div class="section-title">Composição das Cobranças</div>', unsafe_allow_html=True)
     if not df_cob_f.empty and {'Bloco', 'Valor'}.issubset(df_cob_f.columns):
         fig = px.bar(df_cob_f.groupby('Bloco', dropna=False)['Valor'].sum().reset_index(), x='Bloco', y='Valor', height=420, title='Valor por bloco', color_discrete_sequence=[COR_CIANO])
         formatar_fig(fig, height=420, moeda=True)
         st.plotly_chart(fig, width='stretch')
-    st.dataframe(preparar_exibicao(df_cob_f), width='stretch', hide_index=True)
+    try:
+        st.dataframe(preparar_exibicao(df_cob_f), width='stretch', hide_index=True)
+    except Exception:
+        st.table(preparar_exibicao(df_cob_f).astype(str).head(50))
 with aba_dash:
     st.markdown('<div class="section-title">Dashboards HTML do motor</div>', unsafe_allow_html=True)
     dashs = dashboards_existentes()
@@ -1239,7 +1254,10 @@ if aba_admin is not None:
             if logs:
                 st.caption(f'{len(logs)} registro(s)')
                 df_logs = pd.DataFrame(logs)
-                st.dataframe(df_logs.tail(30), hide_index=True, use_container_width=True, height=200)
+                try:
+                    st.dataframe(df_logs.tail(30), hide_index=True, use_container_width=True, height=200)
+                except Exception:
+                    st.table(df_logs.tail(30).astype(str))
                 if st.button('🗑️ Limpar Logs', key='clear_logs', use_container_width=True):
                     if hasattr(logs_acesso, 'LOG_FILE') and logs_acesso.LOG_FILE.exists():
                         logs_acesso.LOG_FILE.unlink()
