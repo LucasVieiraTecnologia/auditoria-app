@@ -882,28 +882,32 @@ with st.sidebar:
     # ── HEADER ──
     st.markdown('<div style="display:flex;align-items:center;gap:0.6rem;padding:0.25rem 0 0.75rem 0;"><span style="font-size:1.4rem;">🏢</span><div><div style="font-weight:800;font-size:0.95rem;color:var(--text-color);">Condomínio</div><div style="font-size:0.7rem;color:var(--text-color);opacity:0.5;font-weight:600;">Candelária</div></div></div>', unsafe_allow_html=True)
     
-    # ── OPERAÇÃO ──
-    st.markdown('<div class="sidebar-section-title">⚙️ Operação</div>', unsafe_allow_html=True)
-    uploads = st.file_uploader('Selecione os PDFs', type=['pdf'], accept_multiple_files=True, label_visibility='collapsed')
-    csave, crun = st.columns(2)
-    with csave:
-        if uploads and st.button('📥 Salvar', key='btn_save', use_container_width=True):
-            qtd = salvar_uploads(uploads)
-            st.toast(f'{qtd} arquivo(s) salvo(s).', icon='✅')
-    with crun:
-        btn_exec = st.button('▶ Executar', key='btn_run', type='primary', use_container_width=True)
-        if btn_exec:
-            if not listar_pdfs():
-                st.warning('Nenhum PDF salvo em ArquivosPDF.')
-            else:
-                with st.spinner('Processando...'):
-                    ok, codigo, log_texto = executar_runner_com_log()
-                    st.session_state['ultimo_log_auditoria'] = log_texto
-                    st.session_state['ultimo_status_auditoria'] = (ok, codigo)
-                if ok:
-                    st.toast('Auditoria concluída com sucesso!', icon='✅')
+    # ── OPERAÇÃO (admin only) ──
+    if st.session_state.get('user_role') == 'admin':
+        st.markdown('<div class="sidebar-section-title">⚙️ Operação</div>', unsafe_allow_html=True)
+        uploads = st.file_uploader('Selecione os PDFs', type=['pdf'], accept_multiple_files=True, label_visibility='collapsed')
+        csave, crun = st.columns(2)
+        with csave:
+            if uploads and st.button('📥 Salvar', key='btn_save', use_container_width=True):
+                qtd = salvar_uploads(uploads)
+                st.toast(f'{qtd} arquivo(s) salvo(s).', icon='✅')
+        with crun:
+            btn_exec = st.button('▶ Executar', key='btn_run', type='primary', use_container_width=True)
+            if btn_exec:
+                if not listar_pdfs():
+                    st.warning('Nenhum PDF salvo em ArquivosPDF.')
                 else:
-                    st.error(f'Falha na auditoria. Código: {codigo}')
+                    with st.spinner('Processando...'):
+                        ok, codigo, log_texto = executar_runner_com_log()
+                        st.session_state['ultimo_log_auditoria'] = log_texto
+                        st.session_state['ultimo_status_auditoria'] = (ok, codigo)
+                    if ok:
+                        st.toast('Auditoria concluída com sucesso!', icon='✅')
+                    else:
+                        st.error(f'Falha na auditoria. Código: {codigo}')
+    else:
+        st.markdown('<div class="sidebar-section-title">📊 Visualização</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size:0.8rem;color:var(--text-color);opacity:0.6;padding:0.5rem 0;">Modo leitura — apenas visualização dos dados.</div>', unsafe_allow_html=True)
     
     st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
     
