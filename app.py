@@ -204,9 +204,16 @@ def check_credentials(username: str, password: str) -> bool:
 def init_auth():
     # Check for persistent login via cookies
     if 'authenticated' not in st.session_state:
-        # Try to restore from cookies if available
-        authenticated_cookie = st.experimental_get_query_params().get('auth', [''])[0]
-        username_cookie = st.experimental_get_query_params().get('user', [''])[0]
+        # Try to restore from query params if available
+        query_params = st.query_params
+        authenticated_cookie = query_params.get('auth', '')
+        username_cookie = query_params.get('user', '')
+        
+        # Handle case where get() returns a list (older Streamlit versions)
+        if isinstance(authenticated_cookie, list):
+            authenticated_cookie = authenticated_cookie[0] if authenticated_cookie else ''
+        if isinstance(username_cookie, list):
+            username_cookie = username_cookie[0] if username_cookie else ''
         
         if authenticated_cookie == 'true' and username_cookie:
             # Verify the user still exists
@@ -374,8 +381,9 @@ def login_screen():
                         users[username]['last_seen'] = datetime.now().isoformat()
                         save_all_users_to_file(users)
                     
-                    # Set cookies for persistent login (valid for 7 days)
-                    st.experimental_set_query_params(auth='true', user=username)
+                # Set cookies for persistent login (valid for 7 days)
+                st.query_params.auth = 'true'
+                st.query_params.user = username
                     
                     logs_acesso.log_acesso(username, 'LOGIN', detalhes='Login realizado com sucesso')
                     st.rerun()
@@ -851,7 +859,7 @@ with st.sidebar:
         st.session_state['username'] = ''
         st.session_state['user_role'] = 'viewer'
         # Clear cookies
-        st.experimental_set_query_params()
+        st.query_params.clear()
         st.rerun()
     
     # Logs de acesso (apenas admin)
