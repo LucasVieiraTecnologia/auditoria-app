@@ -726,8 +726,14 @@ with st.sidebar:
     st.markdown("""
     <style>
     [data-testid=stSidebar] {
-        background: var(--secondary-background-color);
-        border-right: 1px solid color-mix(in srgb, var(--text-color) 10%, transparent);
+        background: var(--secondary-background-color) !important;
+        border-right: 1px solid color-mix(in srgb, var(--text-color) 10%, transparent) !important;
+    }
+    [data-testid=stSidebar] .stApp {
+        background: transparent !important;
+    }
+    section[data-testid="stSidebar"] {
+        background: var(--secondary-background-color) !important;
     }
     .sidebar-section-title {
         font-size: 0.72rem;
