@@ -233,61 +233,158 @@ def login_screen():
     st.markdown("""
     <style>
     .login-container {
+        display: flex;
+        height: 100vh;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        align-items: center;
+    }
+    .login-video {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+    .login-form-container {
+        flex: 1;
         max-width: 400px;
-        margin: 100px auto;
+        margin: 0 auto;
         padding: 40px;
         background: white;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        text-align: center;
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.12);
     }
     .login-title {
         color: #2563eb;
-        font-size: 24px;
-        font-weight: bold;
-        margin-bottom: 30px;
+        font-size: 28px;
+        font-weight: 800;
+        margin-bottom: 24px;
+        text-align: center;
+        letter-spacing: -0.5px;
+    }
+    .login-subtitle {
+        color: #64748b;
+        font-size: 16px;
+        text-align: center;
+        margin-bottom: 32px;
     }
     .login-error {
         color: #dc2626;
         background: #fee2e2;
-        padding: 10px;
-        border-radius: 5px;
-        margin-top: 10px;
+        padding: 12px;
+        border-radius: 8px;
+        margin-top: 16px;
+        text-align: center;
+        font-size: 14px;
+    }
+    .stTextInput > div > div > input {
+        border-radius: 10px;
+        border: 2px solid #e2e8f0;
+        padding: 12px 16px;
+        font-size: 16px;
+        transition: all 0.3s ease;
+    }
+    .stTextInput > div > div > input:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    .stButton > button {
+        width: 100%;
+        border-radius: 12px;
+        border: none;
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        color: white;
+        font-weight: 700;
+        font-size: 16px;
+        padding: 14px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    }
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+        background: linear-gradient(135deg, #1d4ed8, #1e40af);
+    }
+    .stButton > button:active {
+        transform: translateY(0);
+    }
+    @media (max-width: 768px) {
+        .login-container {
+            flex-direction: column;
+            height: auto;
+        }
+        .login-video {
+            margin-bottom: 32px;
+        }
+        .login-form-container {
+            margin: 0 20px;
+        }
     }
     </style>
     """, unsafe_allow_html=True)
     
-    st.markdown('<div class="login-container">', unsafe_allow_html=True)
-    st.markdown('<div class="login-title">🏢 Auditoria Inteligente</div>', unsafe_allow_html=True)
+    # Create columns for video and form
+    col1, col2 = st.columns([1, 1])
     
-    with st.form('login_form'):
-        username = st.text_input('Usuário', placeholder='Digite seu usuário')
-        password = st.text_input('Senha', type='password', placeholder='Digite sua senha')
-        submitted = st.form_submit_button('Entrar', use_container_width=True)
+    with col1:
+        # Display video
+        try:
+            video_file = open('img/Candelaria.mp4', 'rb')
+            video_bytes = video_file.read()
+            st.video(video_bytes)
+        except FileNotFoundError:
+            st.markdown("""
+            <div style="text-align: center; padding: 40px; color: #64748b;">
+                <div style="font-size: 48px; margin-bottom: 16px;">🎥</div>
+                <div>Vídeo Candelaria não encontrado</div>
+                <div style="font-size: 14px; margin-top: 8px;">Verifique se o arquivo está em img/Candelaria.mp4</div>
+            </div>
+            """, unsafe_allow_html=True)
+        except Exception as e:
+            st.markdown(f"""
+            <div style="text-align: center; padding: 40px; color: #dc2626;">
+                <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+                <div>Erro ao carregar vídeo</div>
+                <div style="font-size: 14px; margin-top: 8px;">{str(e)}</div>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown('<div class="login-form-container">', unsafe_allow_html=True)
+        st.markdown('<div class="login-title">🏢 Auditoria Inteligente</div>', unsafe_allow_html=True)
+        st.markdown('<div class="login-subtitle">Sistema de gestão condominial avançado</div>', unsafe_allow_html=True)
         
-        if submitted:
-            if check_credentials(username, password):
-                st.session_state['authenticated'] = True
-                st.session_state['username'] = username
-                st.session_state['user_role'] = 'admin' if username == os.getenv('APP_USERNAME', 'admin') else 'viewer'
-                
-                # Update user login info
-                users = get_all_users()
-                if username in users:
-                    users[username]['last_login'] = datetime.now().isoformat()
-                    users[username]['last_seen'] = datetime.now().isoformat()
-                    save_all_users_to_file(users)
-                
-                # Set cookies for persistent login (valid for 7 days)
-                st.experimental_set_query_params(auth='true', user=username)
-                
-                logs_acesso.log_acesso(username, 'LOGIN', detalhes='Login realizado com sucesso')
-                st.rerun()
-            else:
-                st.markdown('<div class="login-error">Usuário ou senha inválidos</div>', unsafe_allow_html=True)
-                logs_acesso.log_acesso(username or 'desconhecido', 'LOGIN_FALHOU', detalhes='Tentativa de login falhou')
+        with st.form('login_form'):
+            username = st.text_input('Usuário', placeholder='Digite seu usuário')
+            password = st.text_input('Senha', type='password', placeholder='Digite sua senha')
+            submitted = st.form_submit_button('Entrar', use_container_width=True)
+            
+            if submitted:
+                if check_credentials(username, password):
+                    st.session_state['authenticated'] = True
+                    st.session_state['username'] = username
+                    st.session_state['user_role'] = 'admin' if username == os.getenv('APP_USERNAME', 'admin') else 'viewer'
+                    
+                    # Update user login info
+                    users = get_all_users()
+                    if username in users:
+                        users[username]['last_login'] = datetime.now().isoformat()
+                        users[username]['last_seen'] = datetime.now().isoformat()
+                        save_all_users_to_file(users)
+                    
+                    # Set cookies for persistent login (valid for 7 days)
+                    st.experimental_set_query_params(auth='true', user=username)
+                    
+                    logs_acesso.log_acesso(username, 'LOGIN', detalhes='Login realizado com sucesso')
+                    st.rerun()
+                else:
+                    st.markdown('<div class="login-error">Usuário ou senha inválidos</div>', unsafe_allow_html=True)
+                    logs_acesso.log_acesso(username or 'desconhecido', 'LOGIN_FALHOU', detalhes='Tentativa de login falhou')
+        
+        st.markdown('</div>', unsafe_allow_html=True)
     
-    st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
 init_auth()
