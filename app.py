@@ -1442,9 +1442,9 @@ def detail_dialog():
             st.markdown(f"**Tipo:** {html.escape(str(row['Tipo_Movimento']))}")
         link_origem = str(row.get('Link_Origem_NF', '') or '')
         link_consulta = str(row.get('Link_Consulta_NF', '') or '')
-        if link_origem:
+        if link_origem.startswith('http') and link_origem not in ('nan', 'None'):
             st.link_button('🔗 Link original do balancete', link_origem, width='stretch')
-        if link_consulta and link_consulta != link_origem:
+        if link_consulta.startswith('http') and link_consulta not in ('nan', 'None') and link_consulta != link_origem:
             st.link_button('🔗 Link de consulta/documento', link_consulta, width='stretch')
     if st.button("Fechar"):
         st.rerun()
