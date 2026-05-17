@@ -84,12 +84,28 @@ backup.txt
 # PDF uploads directory (will be populated by users)
 ArquivosPDF/
 
-# Other data CSVs can be kept if small, but we exclude large ones
-# Keep the CSVs as they are moderate size
-# auditoria_*.csv are okay (<10MB each)
+# Data CSVs — contêm dados financeiros do condomínio
+# NÃO commitar no GitHub público; o app carrega via secrets ou upload
+auditoria_*.csv
 
-# Secrets
-# (if you have a separate secrets file)
+# Text backups / dumps
+app.txt
+backup.txt
+
+# Streamlit secrets local (contém senhas e chaves de API)
+.streamlit/
+
+# Imagens de divergências (prints de despesas, dados financeiros)
+divergentes_imgs/
+
+# Imagens de notas fiscais (contêm valores, CNPJs, dados reais)
+notas_fiscais/
+
+# Documentos de notas fiscais em PDF (contêm dados financeiros reais)
+documentos_nf/
+
+# Outras mídias com dados do condomínio
+img/
 
 # User database (auto-generated from secrets/env)
 users.json
