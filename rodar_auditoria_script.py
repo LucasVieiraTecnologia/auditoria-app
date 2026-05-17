@@ -1110,9 +1110,11 @@ def processar_pdf(pdf_path):
     mapa_notas = extrair_notas(pdf_path)
     return extrair_balanco_mensal(pdf_path, paginas, meta), extrair_categorias_mensais(pdf_path, paginas, meta), extrair_movimentacoes_analiticas(pdf_path, paginas, meta, mapa_notas), extrair_composicao_cobrancas(pdf_path, paginas, meta)
 
-def main():
+def main(progress_callback=None):
     pdfs = list(Path(PASTA_PDFS).glob("*.pdf"))
     if not pdfs: return
+    if progress_callback:
+        progress_callback(0, f'Limpando arquivos antigos... ({len(pdfs)} PDFs encontrados)')
     for imagem_antiga in Path(PASTA_IMAGENS).glob("*.png"):
         try:
             imagem_antiga.unlink()
@@ -1126,25 +1128,40 @@ def main():
             pass
 
     todos_balancos, todas_categorias, todas_movimentacoes, todas_cobrancas = [], [], [], []
-    for pdf in pdfs:
+    for i, pdf in enumerate(pdfs):
+        if progress_callback:
+            pct = int((i + 1) / len(pdfs) * 60)
+            progress_callback(pct, f'Processando {pdf.name}... ({i + 1}/{len(pdfs)})')
         balanco, categorias, movimentacoes, cobrancas = processar_pdf(pdf)
         if balanco: todos_balancos.append(balanco)
         todas_categorias.extend(categorias)
         todas_movimentacoes.extend(movimentacoes)
         todas_cobrancas.extend(cobrancas)
 
+    if progress_callback:
+        progress_callback(62, 'Consolidando dataframes...')
     df_balanco = criar_dataframe(todos_balancos, COLUNAS_BALANCO).drop_duplicates(subset=["Hash"]).sort_values(by=["Mes_Ano", "Arquivo_Origem"]) if todos_balancos else pd.DataFrame(columns=COLUNAS_BALANCO)
     df_cat = criar_dataframe(todas_categorias, COLUNAS_CATEGORIAS).drop_duplicates(subset=["Hash"]).sort_values(by=["Mes_Ano", "Grupo", "Categoria"]) if todas_categorias else pd.DataFrame(columns=COLUNAS_CATEGORIAS)
     df_mov = criar_dataframe(todas_movimentacoes, COLUNAS_MOVIMENTACOES).drop_duplicates(subset=["Hash"]).sort_values(by=["Mes_Ano", "Data", "Conta", "Tipo_Movimento"]) if todas_movimentacoes else pd.DataFrame(columns=COLUNAS_MOVIMENTACOES)
+    if progress_callback:
+        progress_callback(68, 'Recalculando scores de divergência...')
     df_mov = recalcular_scores_divergencia(df_mov)
     df_cobrancas = criar_dataframe(todas_cobrancas, COLUNAS_COBRANCAS).drop_duplicates(subset=["Hash"]).sort_values(by=["Mes_Ano", "Data_Liquidacao", "Bloco", "Unidade"]) if todas_cobrancas else pd.DataFrame(columns=COLUNAS_COBRANCAS)
-
+    if progress_callback:
+        progress_callback(74, 'Detectando fraudes...')
     df_fraudes = detectar_fraudes(df_mov)
     df_validacao = criar_validacao(df_balanco, df_mov)
-
+    if progress_callback:
+        progress_callback(80, 'Exportando Excel...')
     exportar_excel(df_balanco, df_cat, df_mov, df_cobrancas, df_fraudes, df_validacao)
+    if progress_callback:
+        progress_callback(88, 'Exportando CSVs...')
     exportar_csvs(df_balanco, df_cat, df_mov, df_cobrancas)
+    if progress_callback:
+        progress_callback(95, 'Criando dashboards HTML...')
     criar_dashboards(df_balanco, df_cat, df_mov)
+    if progress_callback:
+        progress_callback(100, 'Auditoria concluída!')
 
 if __name__ == "__main__":
     main()

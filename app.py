@@ -669,7 +669,7 @@ def dashboards_existentes() -> list[tuple[str, Path]]:
 def arquivos_download_existentes() -> list[Path]:
     return [p for p in ARQUIVOS_DOWNLOAD if p.exists()]
 
-def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf):
+def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf, prog=None):
     try:
         from PIL import Image, ImageDraw, ImageFont
         import fitz
@@ -706,6 +706,11 @@ def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf):
             img.save(buf, format='PNG')
             return buf.getvalue()
         
+        def passo(msg, pct):
+            if prog is not None:
+                prog.progress(pct / 100, text=msg)
+        
+        passo('Preparando documento...', 5)
         doc = fitz.open()
         page = doc.new_page()
         y = 50
@@ -726,11 +731,13 @@ def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf):
             page.insert_image(rect, stream=b)
             y += 270
         
+        passo('Escrevendo cabeçalho...', 10)
         txt('RESUMO DA AUDITORIA', bold=True, size=18)
         txt(f'Gerado em: {datetime.now().strftime("%d/%m/%Y %H:%M")}', size=9)
         txt('')
         
         # Balanço
+        passo('Processando balanço...', 20)
         if not df_bal.empty:
             txt('BALANÇO MENSAL', bold=True, size=14)
             txt('')
@@ -744,6 +751,7 @@ def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf):
             txt('')
         
         # Categorias chart
+        passo('Gerando gráfico de categorias...', 35)
         if not df_cat.empty and 'Valor' in df_cat.columns:
             grp = df_cat.groupby('Categoria', dropna=False)['Valor'].sum().sort_values(ascending=False).head(15)
             if not grp.empty:
@@ -752,6 +760,7 @@ def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf):
                     img_bytes(png)
         
         # Movimentações chart
+        passo('Processando movimentações...', 50)
         if not df_mov.empty and 'Valor_Real' in df_mov.columns:
             grp = df_mov.groupby('Categoria', dropna=False)['Valor_Real'].sum().sort_values(ascending=False).head(12) if 'Categoria' in df_mov.columns else None
             if grp is not None and not grp.empty:
@@ -763,6 +772,7 @@ def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf):
             txt('')
         
         # Divergências
+        passo('Analisando divergências...', 60)
         if SCORE_COL in df_mov.columns and df_mov[SCORE_COL].sum() > 0:
             divg = df_mov[df_mov[SCORE_COL] > 0].sort_values(SCORE_COL, ascending=False).head(10)
             txt(f'DIVERGÊNCIAS ({len(divg)})', bold=True, size=14)
@@ -775,7 +785,57 @@ def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf):
                 txt(f'  Score {int(r.get(SCORE_COL, 0))} | {str(r.get("Fornecedor", ""))[:40]} | {moeda_br(r.get("Valor_Real", 0))}', size=8)
             txt('')
         
+        # Pontos de Atenção
+        passo('Montando pontos de atenção...', 75)
+        pontos = []
+        if not df_bal.empty:
+            alertas_div = detectar_divergencia_balanco_mov(df_bal, df_mov)
+            for a in alertas_div:
+                pontos.append(('⚠️ Divergência Balancete vs Analítico', a['mensagem'], 'alta'))
+
+        if not df_mov.empty and SCORE_COL in df_mov.columns:
+            altos = df_mov[df_mov[SCORE_COL].fillna(0) >= 40]
+            if not altos.empty:
+                for _, r in altos.iterrows():
+                    motivo = str(r.get(MOTIVO_COL, 'Sem motivo'))[:80]
+                    pontos.append((f'🔴 Score alto: {int(r.get(SCORE_COL, 0))}', f'{str(r.get("Fornecedor", ""))[:50]} | {moeda_br(r.get("Valor_Real", 0))} | {motivo}', 'alta'))
+
+        if not df_mov.empty and 'Link_NF' in df_mov.columns:
+            sem_nf = df_mov[(df_mov['Link_NF'].fillna('').astype(str).str.len() == 0) & (df_mov['Tipo_Movimento'] == 'Saída')]
+            if not sem_nf.empty:
+                total_sem_nf = sem_nf['Valor_Real'].sum()
+                qtd_sem_nf = len(sem_nf)
+                pontos.append(('📄 Saídas sem NF', f'{qtd_sem_nf} movimentações somando {moeda_br(total_sem_nf)} sem comprovante fiscal', 'media'))
+
+        if not df_mov.empty and 'Valor_Real' in df_mov.columns:
+            saidas = df_mov[df_mov['Tipo_Movimento'] == 'Saída'] if 'Tipo_Movimento' in df_mov.columns else df_mov
+            if not saidas.empty:
+                top5 = saidas.nlargest(5, 'Valor_Real')
+                txt('PONTOS DE ATENÇÃO', bold=True, size=14)
+                txt(f'{len(pontos)} ponto(s) identificado(s)', size=9)
+                txt('')
+                for icone, desc, _ in pontos[:8]:
+                    txt(f'{icone} {desc[:120]}', size=8)
+                txt('')
+
+                top5_png = chart_png_bytes(
+                    [str(r.get('Fornecedor', ''))[:25] for _, r in top5.iterrows()],
+                    list(top5['Valor_Real'].astype(float)),
+                    'Top 5 Maiores Saídas'
+                )
+                if top5_png:
+                    img_bytes(top5_png)
+            else:
+                txt('PONTOS DE ATENÇÃO', bold=True, size=14)
+                txt('Nenhum ponto de atenção identificado.', size=9)
+                txt('')
+        else:
+            txt('PONTOS DE ATENÇÃO', bold=True, size=14)
+            txt('Nenhum ponto de atenção identificado.', size=9)
+            txt('')
+        
         # Cobranças chart
+        passo('Processando cobranças...', 85)
         if not df_cob.empty and 'Valor' in df_cob.columns:
             if 'Bloco' in df_cob.columns:
                 grp = df_cob.groupby('Bloco', dropna=False)['Valor'].sum().sort_values(ascending=False)
@@ -787,6 +847,7 @@ def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf):
             txt('')
         
         # NFs
+        passo('Processando notas fiscais...', 92)
         if not df_nf.empty:
             txt('NOTAS FISCAIS', bold=True, size=14)
             txt(f'Total vinculadas: {len(df_nf)}', size=9)
@@ -800,18 +861,27 @@ def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf):
                             img_bytes(png)
             txt('')
         
+        passo('Finalizando PDF...', 98)
         pdf_bytes = doc.write()
         doc.close()
+        passo('PDF gerado com sucesso!', 100)
         return pdf_bytes
     except Exception as e:
+        if prog is not None:
+            prog.progress(100, text=f'Erro: {e}')
         return None
 
-def executar_runner_com_log() -> tuple[bool, int | None, str]:
+def executar_runner_com_log(prog=None) -> tuple[bool, int | None, str]:
     buffer_out = io.StringIO()
     buffer_err = io.StringIO()
     try:
         with redirect_stdout(buffer_out), redirect_stderr(buffer_err):
-            retorno = runner.main()
+            if prog is not None:
+                def cb(pct, msg):
+                    prog.progress(min(pct, 100), text=msg)
+                retorno = runner.main(progress_callback=cb)
+            else:
+                retorno = runner.main()
         log_texto = buffer_out.getvalue()
         if buffer_err.getvalue():
             log_texto += '\n' + buffer_err.getvalue()
@@ -890,8 +960,8 @@ if is_admin:
                 if not listar_pdfs():
                     st.warning('Nenhum PDF salvo em ArquivosPDF.')
                 else:
-                    with st.spinner('Processando...'):
-                        ok, codigo, log_texto = executar_runner_com_log()
+                    prog_run = st.progress(0, text='Preparando...')
+                    ok, codigo, log_texto = executar_runner_com_log(prog=prog_run)
                         st.session_state['ultimo_log_auditoria'] = log_texto
                         st.session_state['ultimo_status_auditoria'] = (ok, codigo)
                     if ok:
@@ -1286,7 +1356,10 @@ with aba_ia:
         st.rerun()
 
     st.markdown('<hr style="margin: 2rem 0;"><div class="section-title">🔍 Análise IA dos Documentos Divergentes</div>', unsafe_allow_html=True)
-    divergentes = df_mov_f[df_mov_f[SCORE_COL] > 0].sort_values(SCORE_COL, ascending=False).head(10)
+    if SCORE_COL in df_mov_f.columns:
+        divergentes = df_mov_f[df_mov_f[SCORE_COL] > 0].sort_values(SCORE_COL, ascending=False).head(10)
+    else:
+        divergentes = pd.DataFrame()
     if divergentes.empty:
         st.info('Nenhuma divergência encontrada nos dados filtrados.')
     else:
@@ -1539,7 +1612,8 @@ with aba_dash:
 with aba_dl:
     st.markdown('<div class="section-title">Downloads dos relatórios</div>', unsafe_allow_html=True)
     
-    pdf_bytes = gerar_pdf_resumo(df_bal_f, df_cat_f, df_mov_f, df_cob_f, df_nf_f)
+    prog = st.progress(0, text='Iniciando geração do PDF...')
+    pdf_bytes = gerar_pdf_resumo(df_bal_f, df_cat_f, df_mov_f, df_cob_f, df_nf_f, prog=prog)
     if pdf_bytes:
         st.download_button('📄 Baixar resumo em PDF', data=pdf_bytes, file_name='resumo_auditoria.pdf', mime='application/pdf', use_container_width=True)
     
