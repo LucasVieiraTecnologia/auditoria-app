@@ -654,11 +654,14 @@ def dashboards_existentes() -> list[tuple[str, Path]]:
 def arquivos_download_existentes() -> list[Path]:
     return [p for p in ARQUIVOS_DOWNLOAD if p.exists()]
 
-def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf, prog=None):
+def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf, prog=None, secoes=None):
     try:
         from PIL import Image, ImageDraw, ImageFont
         import fitz
         import io as io_module
+        
+        if secoes is None:
+            secoes = {'balanco': True, 'categorias': True, 'movimentacoes': True, 'cobrancas': False, 'nf': True, 'pontos': True}
         
         def chart_png_bytes(labels, values, title, width=620, max_items=15):
             n = min(len(labels), max_items)
@@ -700,7 +703,7 @@ def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf, prog=None):
         page = doc.new_page()
         y = 50
         def txt(text, bold=False, size=11):
-            nonlocal y
+            nonlocal y, page
             if y > 760:
                 page = doc.new_page()
                 y = 50
@@ -708,7 +711,7 @@ def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf, prog=None):
             y += size * 1.5
         
         def img_bytes(b):
-            nonlocal y
+            nonlocal y, page
             if y > 700:
                 page = doc.new_page()
                 y = 50
@@ -722,124 +725,129 @@ def gerar_pdf_resumo(df_bal, df_cat, df_mov, df_cob, df_nf, prog=None):
         txt('')
         
         # Balanço
-        passo('Processando balanço...', 20)
-        if not df_bal.empty:
-            txt('BALANÇO MENSAL', bold=True, size=14)
-            txt('')
-            for _, r in df_bal.iterrows():
-                vals = []
-                for c in ['Mes_Ano', 'Saldo_Anterior', 'Total_Receitas', 'Total_Despesas', 'Movimento_Liquido', 'Saldo_Final']:
-                    if c in df_bal.columns:
-                        v = r.get(c, '')
-                        vals.append(str(v)[:30])
-                txt(' | '.join(vals), size=8)
-            txt('')
+        if secoes.get('balanco'):
+            passo('Processando balanço...', 20)
+            if not df_bal.empty:
+                txt('BALANÇO MENSAL', bold=True, size=14)
+                txt('')
+                for _, r in df_bal.iterrows():
+                    vals = []
+                    for c in ['Mes_Ano', 'Saldo_Anterior', 'Total_Receitas', 'Total_Despesas', 'Movimento_Liquido', 'Saldo_Final']:
+                        if c in df_bal.columns:
+                            v = r.get(c, '')
+                            vals.append(str(v)[:30])
+                    txt(' | '.join(vals), size=8)
+                txt('')
         
         # Categorias chart
-        passo('Gerando gráfico de categorias...', 35)
-        if not df_cat.empty and 'Valor' in df_cat.columns:
-            grp = df_cat.groupby('Categoria', dropna=False)['Valor'].sum().sort_values(ascending=False).head(15)
-            if not grp.empty:
-                png = chart_png_bytes(list(grp.index), list(grp.values), 'Categorias — Top 15')
-                if png:
-                    img_bytes(png)
+        if secoes.get('categorias'):
+            passo('Gerando gráfico de categorias...', 35)
+            if not df_cat.empty and 'Valor' in df_cat.columns:
+                grp = df_cat.groupby('Categoria', dropna=False)['Valor'].sum().sort_values(ascending=False).head(15)
+                if not grp.empty:
+                    png = chart_png_bytes(list(grp.index), list(grp.values), 'Categorias — Top 15')
+                    if png:
+                        img_bytes(png)
         
         # Movimentações chart
-        passo('Processando movimentações...', 50)
-        if not df_mov.empty and 'Valor_Real' in df_mov.columns:
-            grp = df_mov.groupby('Categoria', dropna=False)['Valor_Real'].sum().sort_values(ascending=False).head(12) if 'Categoria' in df_mov.columns else None
-            if grp is not None and not grp.empty:
-                png = chart_png_bytes(list(grp.index), list(grp.values), 'Movimentações por categoria')
-                if png:
-                    img_bytes(png)
-            txt(f'Total de registros: {len(df_mov)}', size=9)
-            txt(f'Total movimentado: {moeda_br(df_mov["Valor_Real"].sum())}', size=9)
-            txt('')
-        
-        # Divergências
-        passo('Analisando divergências...', 60)
-        if SCORE_COL in df_mov.columns and df_mov[SCORE_COL].sum() > 0:
-            divg = df_mov[df_mov[SCORE_COL] > 0].sort_values(SCORE_COL, ascending=False).head(10)
-            txt(f'DIVERGÊNCIAS ({len(divg)})', bold=True, size=14)
-            txt('')
-            if 'Fornecedor' in divg.columns and 'Valor_Real' in divg.columns:
-                png = chart_png_bytes(list(divg['Fornecedor'].astype(str)), list(divg['Valor_Real'].astype(float)), 'Divergências — Top 10')
-                if png:
-                    img_bytes(png)
-            for _, r in divg.iterrows():
-                txt(f'  Score {int(r.get(SCORE_COL, 0))} | {str(r.get("Fornecedor", ""))[:40]} | {moeda_br(r.get("Valor_Real", 0))}', size=8)
-            txt('')
-        
-        # Pontos de Atenção
-        passo('Montando pontos de atenção...', 75)
-        pontos = []
-        if not df_bal.empty:
-            alertas_div = detectar_divergencia_balanco_mov(df_bal, df_mov)
-            for a in alertas_div:
-                pontos.append(('⚠️ Divergência Balancete vs Analítico', a['mensagem'], 'alta'))
-
-        if not df_mov.empty and SCORE_COL in df_mov.columns:
-            altos = df_mov[df_mov[SCORE_COL].fillna(0) >= 40]
-            if not altos.empty:
-                for _, r in altos.iterrows():
-                    motivo = str(r.get(MOTIVO_COL, 'Sem motivo'))[:80]
-                    pontos.append((f'🔴 Score alto: {int(r.get(SCORE_COL, 0))}', f'{str(r.get("Fornecedor", ""))[:50]} | {moeda_br(r.get("Valor_Real", 0))} | {motivo}', 'alta'))
-
-        if not df_mov.empty and 'Link_NF' in df_mov.columns:
-            sem_nf = df_mov[(df_mov['Link_NF'].fillna('').astype(str).str.len() == 0) & (df_mov['Tipo_Movimento'] == 'Saída')]
-            if not sem_nf.empty:
-                total_sem_nf = sem_nf['Valor_Real'].sum()
-                qtd_sem_nf = len(sem_nf)
-                pontos.append(('📄 Saídas sem NF', f'{qtd_sem_nf} movimentações somando {moeda_br(total_sem_nf)} sem comprovante fiscal', 'media'))
-
-        if not df_mov.empty and 'Valor_Real' in df_mov.columns:
-            saidas = df_mov[df_mov['Tipo_Movimento'] == 'Saída'] if 'Tipo_Movimento' in df_mov.columns else df_mov
-            if not saidas.empty:
-                top5 = saidas.nlargest(5, 'Valor_Real')
-                txt('PONTOS DE ATENÇÃO', bold=True, size=14)
-                txt(f'{len(pontos)} ponto(s) identificado(s)', size=9)
+        if secoes.get('movimentacoes'):
+            passo('Processando movimentações...', 50)
+            if not df_mov.empty and 'Valor_Real' in df_mov.columns:
+                grp = df_mov.groupby('Categoria', dropna=False)['Valor_Real'].sum().sort_values(ascending=False).head(12) if 'Categoria' in df_mov.columns else None
+                if grp is not None and not grp.empty:
+                    png = chart_png_bytes(list(grp.index), list(grp.values), 'Movimentações por categoria')
+                    if png:
+                        img_bytes(png)
+                txt(f'Total de registros: {len(df_mov)}', size=9)
+                txt(f'Total movimentado: {moeda_br(df_mov["Valor_Real"].sum())}', size=9)
                 txt('')
-                for icone, desc, _ in pontos[:8]:
-                    txt(f'{icone} {desc[:120]}', size=8)
+        
+        # Divergências + Pontos de Atenção
+        if secoes.get('pontos'):
+            passo('Analisando divergências...', 60)
+            if SCORE_COL in df_mov.columns and df_mov[SCORE_COL].sum() > 0:
+                divg = df_mov[df_mov[SCORE_COL] > 0].sort_values(SCORE_COL, ascending=False).head(10)
+                txt(f'DIVERGÊNCIAS ({len(divg)})', bold=True, size=14)
                 txt('')
+                if 'Fornecedor' in divg.columns and 'Valor_Real' in divg.columns:
+                    png = chart_png_bytes(list(divg['Fornecedor'].astype(str)), list(divg['Valor_Real'].astype(float)), 'Divergências — Top 10')
+                    if png:
+                        img_bytes(png)
+                for _, r in divg.iterrows():
+                    txt(f'  Score {int(r.get(SCORE_COL, 0))} | {str(r.get("Fornecedor", ""))[:40]} | {moeda_br(r.get("Valor_Real", 0))}', size=8)
+                txt('')
+            
+            passo('Montando pontos de atenção...', 75)
+            pontos = []
+            if not df_bal.empty:
+                alertas_div = detectar_divergencia_balanco_mov(df_bal, df_mov)
+                for a in alertas_div:
+                    pontos.append(('⚠️ Divergência Balancete vs Analítico', a['mensagem'], 'alta'))
 
-                top5_png = chart_png_bytes(
-                    [str(r.get('Fornecedor', ''))[:25] for _, r in top5.iterrows()],
-                    list(top5['Valor_Real'].astype(float)),
-                    'Top 5 Maiores Saídas'
-                )
-                if top5_png:
-                    img_bytes(top5_png)
+            if not df_mov.empty and SCORE_COL in df_mov.columns:
+                altos = df_mov[df_mov[SCORE_COL].fillna(0) >= 40]
+                if not altos.empty:
+                    for _, r in altos.iterrows():
+                        motivo = str(r.get(MOTIVO_COL, 'Sem motivo'))[:80]
+                        pontos.append((f'🔴 Score alto: {int(r.get(SCORE_COL, 0))}', f'{str(r.get("Fornecedor", ""))[:50]} | {moeda_br(r.get("Valor_Real", 0))} | {motivo}', 'alta'))
+
+            if not df_mov.empty and 'Link_NF' in df_mov.columns:
+                sem_nf = df_mov[(df_mov['Link_NF'].fillna('').astype(str).str.len() == 0) & (df_mov['Tipo_Movimento'] == 'Saída')]
+                if not sem_nf.empty:
+                    total_sem_nf = sem_nf['Valor_Real'].sum()
+                    qtd_sem_nf = len(sem_nf)
+                    pontos.append(('📄 Saídas sem NF', f'{qtd_sem_nf} movimentações somando {moeda_br(total_sem_nf)} sem comprovante fiscal', 'media'))
+
+            if not df_mov.empty and 'Valor_Real' in df_mov.columns:
+                saidas = df_mov[df_mov['Tipo_Movimento'] == 'Saída'] if 'Tipo_Movimento' in df_mov.columns else df_mov
+                if not saidas.empty:
+                    top5 = saidas.nlargest(5, 'Valor_Real')
+                    txt('PONTOS DE ATENÇÃO', bold=True, size=14)
+                    txt(f'{len(pontos)} ponto(s) identificado(s)', size=9)
+                    txt('')
+                    for icone, desc, _ in pontos[:8]:
+                        txt(f'{icone} {desc[:120]}', size=8)
+                    txt('')
+
+                    top5_png = chart_png_bytes(
+                        [str(r.get('Fornecedor', ''))[:25] for _, r in top5.iterrows()],
+                        list(top5['Valor_Real'].astype(float)),
+                        'Top 5 Maiores Saídas'
+                    )
+                    if top5_png:
+                        img_bytes(top5_png)
+                else:
+                    txt('PONTOS DE ATENÇÃO', bold=True, size=14)
+                    txt('Nenhum ponto de atenção identificado.', size=9)
+                    txt('')
             else:
                 txt('PONTOS DE ATENÇÃO', bold=True, size=14)
                 txt('Nenhum ponto de atenção identificado.', size=9)
                 txt('')
-        else:
-            txt('PONTOS DE ATENÇÃO', bold=True, size=14)
-            txt('Nenhum ponto de atenção identificado.', size=9)
-            txt('')
         
         # Cobranças chart
-        passo('Processando cobranças...', 85)
-        if not df_cob.empty and 'Valor' in df_cob.columns:
-            if 'Bloco' in df_cob.columns:
-                grp = df_cob.groupby('Bloco', dropna=False)['Valor'].sum().sort_values(ascending=False)
-                png = chart_png_bytes(list(grp.index), list(grp.values), 'Cobranças por bloco')
-                if png:
-                    img_bytes(png)
-            txt(f'Total: {len(df_cob)} registros', size=9)
-            txt(f'Valor total: {moeda_br(df_cob["Valor"].sum())}', size=9)
-            txt('')
+        if secoes.get('cobrancas'):
+            passo('Processando cobranças...', 85)
+            if not df_cob.empty and 'Valor' in df_cob.columns:
+                if 'Bloco' in df_cob.columns:
+                    grp = df_cob.groupby('Bloco', dropna=False)['Valor'].sum().sort_values(ascending=False)
+                    png = chart_png_bytes(list(grp.index), list(grp.values), 'Cobranças por bloco')
+                    if png:
+                        img_bytes(png)
+                txt(f'Total: {len(df_cob)} registros', size=9)
+                txt(f'Valor total: {moeda_br(df_cob["Valor"].sum())}', size=9)
+                txt('')
         
         # NFs
-        passo('Processando notas fiscais...', 92)
-        if not df_nf.empty:
-            txt('NOTAS FISCAIS', bold=True, size=14)
-            txt(f'Total vinculadas: {len(df_nf)}', size=9)
-            if 'Valor_Real' in df_nf.columns:
-                txt(f'Valor total: {moeda_br(df_nf["Valor_Real"].sum())}', size=9)
-                if 'Fornecedor' in df_nf.columns:
-                    grp = df_nf.groupby('Fornecedor', dropna=False)['Valor_Real'].sum().sort_values(ascending=False).head(12)
+        if secoes.get('nf'):
+            passo('Processando notas fiscais...', 92)
+            if not df_nf.empty:
+                txt('NOTAS FISCAIS', bold=True, size=14)
+                txt(f'Total vinculadas: {len(df_nf)}', size=9)
+                if 'Valor_Real' in df_nf.columns:
+                    txt(f'Valor total: {moeda_br(df_nf["Valor_Real"].sum())}', size=9)
+                    if 'Fornecedor' in df_nf.columns:
+                        grp = df_nf.groupby('Fornecedor', dropna=False)['Valor_Real'].sum().sort_values(ascending=False).head(12)
                     if not grp.empty:
                         png = chart_png_bytes(list(grp.index), list(grp.values), 'NFs por fornecedor')
                         if png:
@@ -1154,9 +1162,9 @@ if alertas_div:
     if len(alertas_div) > 5:
         st.caption(f'+ {len(alertas_div) - 5} outras divergências detectadas.')
 
-tab_labels = ['📈 Visão Executiva', '🤖 Assistente IA', '💰 Balanço', '🧩 Categorias', '🧾 Notas Fiscais', '🔎 Movimentações', '🌐 HTMLs', '📥 Downloads']
+tab_labels = ['📈 Visão Executiva', '🤖 Assistente IA', '💰 Balanço', '🧩 Categorias', '🧾 Notas Fiscais', '🔎 Movimentações', '📥 Downloads']
 tabs = st.tabs(tab_labels)
-aba_exec, aba_ia, aba_balanco, aba_cat, aba_nf, aba_mov, aba_dash, aba_dl = tabs
+aba_exec, aba_ia, aba_balanco, aba_cat, aba_nf, aba_mov, aba_dl = tabs
 
 with aba_exec:
     r1c1, r1c2 = st.columns(2)
@@ -1642,22 +1650,34 @@ with aba_mov:
                     st.session_state[page_key] = min(total_pages, page + 1)
                     st.rerun()
 
-with aba_dash:
-    st.markdown('<div class="section-title">Dashboards HTML do motor</div>', unsafe_allow_html=True)
-    dashs = dashboards_existentes()
-    if not dashs:
-        st.info('Nenhum dashboard HTML foi encontrado ainda. Execute a auditoria para gerá-los.')
-    else:
-        abas_dash = st.tabs([nome for nome, _ in dashs])
-        for aba, (nome, arquivo) in zip(abas_dash, dashs):
-            with aba:
-                with open(arquivo, 'r', encoding='utf-8') as f:
-                    html_data = f.read()
-                components.html(html_data, height=740, scrolling=True)
 with aba_dl:
     st.markdown('<div class="section-title">Downloads dos relatórios</div>', unsafe_allow_html=True)
     
+    st.markdown('**Seções do PDF:**')
+    c_pdf = st.columns(3)
+    with c_pdf[0]:
+        incluir_bal = st.checkbox('💰 Balanço', value=True, key='pdf_bal')
+        incluir_cat = st.checkbox('🧩 Categorias', value=True, key='pdf_cat')
+    with c_pdf[1]:
+        incluir_mov = st.checkbox('🔎 Movimentações', value=True, key='pdf_mov')
+        incluir_cob = st.checkbox('🏷️ Cobranças', value=False, key='pdf_cob')
+    with c_pdf[2]:
+        incluir_nf = st.checkbox('🧾 Notas Fiscais', value=True, key='pdf_nf')
+        incluir_pontos = st.checkbox('⚠️ Pontos de Atenção', value=True, key='pdf_pontos')
+    
     if st.button('📄 Gerar PDF Resumo', key='btn_gerar_pdf', use_container_width=True, type='primary'):
+        prog = st.progress(0, text='Gerando PDF...')
+        pdf_bytes = gerar_pdf_resumo(df_bal_f, df_cat_f, df_mov_f, df_cob, df_nf_f, prog=prog, secoes={
+            'balanco': st.session_state.get('pdf_bal', True),
+            'categorias': st.session_state.get('pdf_cat', True),
+            'movimentacoes': st.session_state.get('pdf_mov', True),
+            'cobrancas': st.session_state.get('pdf_cob', False),
+            'nf': st.session_state.get('pdf_nf', True),
+            'pontos': st.session_state.get('pdf_pontos', True),
+        })
+        st.session_state['pdf_resumo_bytes'] = pdf_bytes
+        st.toast('PDF gerado com sucesso!', icon='✅')
+    if st.session_state.get('pdf_resumo_bytes'):
         prog = st.progress(0, text='Gerando PDF...')
         pdf_bytes = gerar_pdf_resumo(df_bal_f, df_cat_f, df_mov_f, df_cob, df_nf_f, prog=prog)
         st.session_state['pdf_resumo_bytes'] = pdf_bytes
