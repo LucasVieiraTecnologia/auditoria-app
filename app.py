@@ -6,8 +6,6 @@ import io
 import html
 import json
 import os
-import re
-import hashlib
 import shutil
 import traceback
 import base64
@@ -115,7 +113,7 @@ def get_all_users():
         else:
             merged[username] = disk_users[username].copy()
 
-    save_all_users_to_file(merged)
+    # Não salva aqui — é chamado apenas quando algo muda (criação de usuário, login)
     return merged
 
 def save_all_users_to_file(users_dict):
@@ -131,11 +129,17 @@ def save_all_users_to_file(users_dict):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 def update_user_last_seen(username):
-    """Atualiza o timestamp de última visualização do usuário"""
+    """Atualiza o timestamp de última visualização do usuário (no máximo a cada 30s)"""
+    now = datetime.now()
+    last_key = f'_last_seen_write_{username}'
+    last_write = st.session_state.get(last_key)
+    if last_write and (now - last_write).total_seconds() < 30:
+        return
     users = get_all_users()
     if username in users:
-        users[username]['last_seen'] = datetime.now().isoformat()
+        users[username]['last_seen'] = now.isoformat()
         save_all_users_to_file(users)
+        st.session_state[last_key] = now
 
 def is_user_online(username, minutes=5):
     """Verifica se o usuário está online (ativo nos últimos X minutos)"""
@@ -453,67 +457,6 @@ def sanitizar_arrow(df: pd.DataFrame) -> pd.DataFrame:
                     safe.append(v)
             out[col] = safe
     return out
-
-def gerar_link_verificacao_nf(chave_nf: str, numero_nf: str = '', tipo: str = '') -> tuple[str, str]:
-    if chave_nf and len(chave_nf) >= 44:
-        url = f'https://www.nfe.fazenda.gov.br/portal/consultaRecaptcha.aspx?tipoConteudo=XbSeqxE8pl8=&chaveAcesso={chave_nf[:44]}'
-        return 'Verificar NF-e na SEFAZ', url
-    if numero_nf and tipo:
-        tipo_norm = tipo.lower()
-        if 'nfs' in tipo_norm or 'municipal' in tipo_norm:
-            return 'Consultar NFS-e (Nacional)', 'https://nfs-e.municipios.gov.br/'
-    return 'Verificação online', 'https://www.nfe.fazenda.gov.br/portal/consulta.aspx'
-
-def buscar_empresa_cnpj(cnpj: str) -> dict:
-    cnpj_limpo = re.sub(r'\D', '', str(cnpj or ''))
-    if len(cnpj_limpo) != 14:
-        return {}
-    try:
-        req = Request(f'https://brasilapi.com.br/api/cnpj/v1/{cnpj_limpo}', headers={'User-Agent': 'AuditoriaCondominio/1.0'})
-        with urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
-        return {
-            'razao_social': data.get('razao_social', ''),
-            'nome_fantasia': data.get('nome_fantasia', ''),
-            'situacao': data.get('descricao_situacao_cadastral', ''),
-            'atividade': data.get('descricao_tipo_logradouro', '') + ' ' + data.get('cnae_fiscal_descricao', ''),
-            'endereco': f"{data.get('logradouro', '')}, {data.get('numero', '')} - {data.get('bairro', '')}/{data.get('municipio', '')}-{data.get('uf', '')}",
-        }
-    except Exception:
-        return {}
-
-def explicar_item_ia(fornecedor: str, descricao: str, valor: float, categoria: str, cnpj: str = '') -> str:
-    api_key = os.getenv('OPENAI_API_KEY')
-    if not api_key:
-        return 'Configure OPENAI_API_KEY ou OPENROUTER_API_KEY para ativar explicações por IA.'
-    prompt = f'Explique de forma concisa e prática para um auditor de condomínios:\n'
-    prompt += f'- Fornecedor: {fornecedor or "Não identificado"}\n'
-    prompt += f'- Descrição: {descricao}\n'
-    prompt += f'- Valor: {moeda_br(valor)}\n'
-    prompt += f'- Categoria: {categoria or "Não classificada"}\n'
-    if cnpj:
-        prompt += f'- CNPJ: {cnpj}\n'
-    prompt += f'\nResponda em português. Inclua: tipo de serviço/obra, riscos comuns, o que verificar no documento, e se há indícios de sobrepreço ou irregularidade. Seja direto.'
-    mensagens = [
-        {'role': 'system', 'content': 'Você é um analista sênior de auditoria condominial. Responda em português, seja direto, use bullet points e destaque riscos e próximos passos práticos.'},
-        {'role': 'user', 'content': prompt},
-    ]
-    payload = json.dumps({'model': OPENAI_MODEL, 'messages': mensagens, 'temperature': 0.3, 'max_tokens': 600}).encode('utf-8')
-    req = Request(
-        f'{OPENAI_BASE_URL}/chat/completions',
-        data=payload,
-        headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json', 'HTTP-Referer': 'http://localhost:8501', 'X-Title': 'AuditoriaCondominio'},
-        method='POST',
-    )
-    try:
-        with urlopen(req, timeout=45) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
-        return data['choices'][0]['message']['content']
-    except HTTPError as exc:
-        detalhe = exc.read().decode('utf-8', errors='ignore')[:300]
-        return f'Erro na IA ({exc.code}): {detalhe}'
-    except Exception as exc:
-        return f'Não foi possível consultar a IA: {exc}'
 
 def detectar_divergencia_balanco_mov(df_bal: pd.DataFrame, df_mov: pd.DataFrame) -> list[dict]:
     alertas = []
@@ -902,6 +845,7 @@ def executar_runner_com_log(prog=None) -> tuple[bool, int | None, str]:
         log_texto += '\n' + traceback.format_exc()
         return False, -1, log_texto
 
+@st.cache_data(show_spinner='Carregando bases de dados...')
 def carregar_bases() -> dict[str, pd.DataFrame]:
     df_bal = carregar_csv_seguro(ARQUIVO_CSV_BALANCO)
     df_cat = carregar_csv_seguro(ARQUIVO_CSV_CATEGORIAS)
@@ -969,6 +913,7 @@ if is_admin:
                     st.session_state['ultimo_status_auditoria'] = (ok, codigo)
                     if ok:
                         st.toast('Auditoria concluída com sucesso!', icon='✅')
+                        st.cache_data.clear()
                     else:
                         st.error(f'Falha na auditoria. Código: {codigo}')
 
@@ -1402,6 +1347,22 @@ with aba_balanco:
         st.dataframe(sanitizar_arrow(preparar_exibicao(df_bal_f)), width='stretch', hide_index=True)
     except Exception:
         st.table(preparar_exibicao(df_bal_f).astype(str).head(50))
+
+    if not df_bal_f.empty and 'Mes_Ano' in df_bal_f.columns:
+        st.markdown('<div class="section-title">Variação Mês a Mês</div>', unsafe_allow_html=True)
+        bal_mom = df_bal_f[['Mes_Ano', 'Total_Receitas', 'Total_Despesas', 'Movimento_Liquido', 'Saldo_Final']].copy()
+        for col in ['Total_Receitas', 'Total_Despesas', 'Movimento_Liquido', 'Saldo_Final']:
+            if col in bal_mom.columns:
+                bal_mom[f'{col}_Var%'] = bal_mom[col].pct_change() * 100
+        bal_mom = bal_mom.sort_values('Mes_Ano').reset_index(drop=True)
+        mom_display = bal_mom.copy()
+        for col in ['Total_Receitas', 'Total_Despesas', 'Movimento_Liquido', 'Saldo_Final']:
+            if col in mom_display.columns:
+                var_col = f'{col}_Var%'
+                if var_col in mom_display.columns:
+                    mom_display[var_col] = mom_display[var_col].apply(
+                        lambda x: f'{x:+.1f}%' if pd.notna(x) else '—')
+        st.dataframe(sanitizar_arrow(mom_display), width='stretch', hide_index=True)
 with aba_cat:
     st.markdown('<div class="section-title">Categorias Mensais</div>', unsafe_allow_html=True)
     if not df_cat_f.empty:
@@ -1596,6 +1557,30 @@ with aba_cob:
             fig = px.bar(df_cob_f.groupby('Bloco', dropna=False)['Valor'].sum().reset_index(), x='Bloco', y='Valor', height=420, title='Valor por bloco', color_discrete_sequence=[COR_CIANO])
             formatar_fig(fig, height=420, moeda=True)
             st.plotly_chart(fig, width='stretch')
+
+        if 'Vencimento' in df_cob_f.columns and 'Data_Liquidacao' in df_cob_f.columns:
+            st.markdown('<div class="section-title">Aging de Inadimplência</div>', unsafe_allow_html=True)
+            hoje = pd.Timestamp.now().normalize()
+            df_cob_aging = df_cob_f.copy()
+            if 'Vencimento' in df_cob_f.columns:
+                df_cob_aging['Vencimento'] = pd.to_datetime(df_cob_aging['Vencimento'], errors='coerce')
+            if 'Data_Liquidacao' in df_cob_f.columns:
+                df_cob_aging['Data_Liquidacao'] = pd.to_datetime(df_cob_aging['Data_Liquidacao'], errors='coerce')
+            nao_pagas = df_cob_aging[df_cob_aging['Data_Liquidacao'].isna()].copy()
+            if not nao_pagas.empty:
+                nao_pagas['Dias_Atraso'] = (hoje - nao_pagas['Vencimento']).dt.days
+                faixas = [0, 30, 60, 90, 180, 9999]
+                rotulos = ['A vencer (≤30d)', '30-59 dias', '60-89 dias', '90-179 dias', '180+ dias']
+                nao_pagas['Faixa_Aging'] = pd.cut(nao_pagas['Dias_Atraso'].clip(lower=0), bins=faixas, labels=rotulos, right=False)
+                aging = nao_pagas.groupby('Faixa_Aging', observed=False).agg(Quantidade=('Valor', 'count'), Total=('Valor', 'sum')).reset_index()
+                aging.columns = ['Faixa', 'Qtd', 'Total']
+                st.dataframe(aging, width='stretch', hide_index=True, column_config={'Total': st.column_config.NumberColumn(format='R$ %.2f')})
+                fig_aging = px.bar(aging, x='Faixa', y='Total', height=360, title='Distribuição da inadimplência por faixa de atraso', color_discrete_sequence=[COR_SAIDA], text_auto='.2s')
+                formatar_fig(fig_aging, height=360, moeda=True)
+                st.plotly_chart(fig_aging, width='stretch')
+            else:
+                st.success('Nenhum registro em aberto — todas as cobranças foram liquidadas.')
+
         try:
             st.dataframe(sanitizar_arrow(preparar_exibicao(df_cob_f)), width='stretch', hide_index=True)
         except Exception:
@@ -1615,10 +1600,16 @@ with aba_dash:
 with aba_dl:
     st.markdown('<div class="section-title">Downloads dos relatórios</div>', unsafe_allow_html=True)
     
-    prog = st.progress(0, text='Iniciando geração do PDF...')
-    pdf_bytes = gerar_pdf_resumo(df_bal_f, df_cat_f, df_mov_f, df_cob_f, df_nf_f, prog=prog)
-    if pdf_bytes:
-        st.download_button('📄 Baixar resumo em PDF', data=pdf_bytes, file_name='resumo_auditoria.pdf', mime='application/pdf', use_container_width=True)
+    if st.button('📄 Gerar PDF Resumo', key='btn_gerar_pdf', use_container_width=True, type='primary'):
+        prog = st.progress(0, text='Gerando PDF...')
+        pdf_bytes = gerar_pdf_resumo(df_bal_f, df_cat_f, df_mov_f, df_cob_f, df_nf_f, prog=prog)
+        st.session_state['pdf_resumo_bytes'] = pdf_bytes
+        st.rerun()
+    if st.session_state.get('pdf_resumo_bytes'):
+        st.download_button('📄 Baixar resumo em PDF', data=st.session_state['pdf_resumo_bytes'], file_name='resumo_auditoria.pdf', mime='application/pdf', use_container_width=True)
+        if st.button('🔄 Regenerar PDF', key='btn_regenerar_pdf', use_container_width=True):
+            st.session_state.pop('pdf_resumo_bytes', None)
+            st.rerun()
     
     existentes = arquivos_download_existentes()
     if not existentes:
