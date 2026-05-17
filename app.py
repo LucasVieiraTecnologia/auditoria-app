@@ -1235,35 +1235,6 @@ with aba_nf:
         
         st.caption(f'{len(filtro)} item(ns) encontrado(s)  ·  {filtro["_tem_img"].sum()} com imagem')
         
-        MAX_EXP = 80
-        for idx, (_, row) in enumerate(filtro.head(MAX_EXP).iterrows()):
-            tem_img = row['_tem_img']
-            label = f"{'🖼️' if tem_img else '📄'} {row.get('Data', '')} | {row['_forn']} | {moeda_br(row.get('Valor_Real', 0))}"
-            with st.expander(label, expanded=False):
-                c1, c2 = st.columns([1.2, 1])
-                with c1:
-                    caminho_img = str(row.get('Link_NF', '') or '')
-                    if tem_img:
-                        st.image(caminho_img, caption=Path(caminho_img).name, width='stretch')
-                    else:
-                        st.info('Imagem não disponível no momento (execute a auditoria para gerar)')
-                with c2:
-                    st.markdown(f"**Fornecedor:** {html.escape(str(row.get('Fornecedor', '')))}")
-                    st.markdown(f"**Descrição:** {html.escape(str(row.get('Descricao', '')))}")
-                    st.markdown(f"**Valor:** {moeda_br(row.get('Valor_Real', 0))}")
-                    st.markdown(f"**Número NF:** `{html.escape(str(row.get('Numero_NF', '') or '—'))}`")
-                    st.markdown(f"**Chave NF:** `{html.escape(str(row.get('Chave_NF', '') or '—'))}`")
-                    st.markdown(f"**Status:** {html.escape(str(row.get('Status_Consulta_NF', '') or '—'))}")
-                    link_origem = str(row.get('Link_Origem_NF', '') or '')
-                    link_consulta = str(row.get('Link_Consulta_NF', '') or '')
-                    if link_origem:
-                        st.link_button('🔗 Link original do balancete', link_origem, width='stretch')
-                    if link_consulta and link_consulta != link_origem:
-                        st.link_button('🔗 Link de consulta/documento', link_consulta, width='stretch')
-        
-        if len(filtro) > MAX_EXP:
-            st.caption(f'Mostrando {MAX_EXP} de {len(filtro)} itens. Refine a busca para ver mais.')
-        
         st.divider()
         st.markdown('<div class="section-title">Tabela completa</div>', unsafe_allow_html=True)
         colunas_nf = [c for c in ['Data', 'Fornecedor', 'Descricao', 'Valor_Real', 'Numero_NF', 'Chave_NF', 'Status_Consulta_NF', 'Link_Consulta_NF', 'Link_Origem_NF', 'Arquivo_NF_Baixado', 'Link_NF'] if c in df_nf_f.columns]
@@ -1283,7 +1254,6 @@ with aba_nf:
                 },
             )
         except Exception:
-            # Fallback: format Valor_Real as R$ string and show as text
             if 'Valor_Real' in df_display.columns:
                 df_display['Valor_Real'] = df_display['Valor_Real'].apply(lambda x: moeda_br(x) if pd.notna(x) else '')
             try:
@@ -1293,6 +1263,48 @@ with aba_nf:
                     st.table(df_display.astype(str).fillna('').head(50))
                 except Exception:
                     st.warning('Não foi possível exibir a tabela.')
+        
+        total_itens = len(filtro)
+        if total_itens > 20:
+            key_btn = 'ver_lista_nf'
+            if key_btn not in st.session_state:
+                st.session_state[key_btn] = False
+            btn_lbl = f'🔽 Esconder lista ({total_itens} itens)' if st.session_state[key_btn] else f'📋 Ver lista completa ({total_itens} itens)'
+            if st.button(btn_lbl, key=key_btn+'_btn', use_container_width=True):
+                st.session_state[key_btn] = not st.session_state[key_btn]
+                st.rerun()
+        else:
+            st.session_state['ver_lista_nf'] = True
+        
+        if st.session_state.get('ver_lista_nf', True):
+            MAX_EXP = 80
+            for idx, (_, row) in enumerate(filtro.head(MAX_EXP).iterrows()):
+                tem_img = row['_tem_img']
+                label = f"{'🖼️' if tem_img else '📄'} {row.get('Data', '')} | {row['_forn']} | {moeda_br(row.get('Valor_Real', 0))}"
+                with st.expander(label, expanded=False):
+                    c1, c2 = st.columns([1.2, 1])
+                    with c1:
+                        caminho_img = str(row.get('Link_NF', '') or '')
+                        if tem_img:
+                            st.image(caminho_img, caption=Path(caminho_img).name, width='stretch')
+                        else:
+                            st.info('Imagem não disponível no momento (execute a auditoria para gerar)')
+                    with c2:
+                        st.markdown(f"**Fornecedor:** {html.escape(str(row.get('Fornecedor', '')))}")
+                        st.markdown(f"**Descrição:** {html.escape(str(row.get('Descricao', '')))}")
+                        st.markdown(f"**Valor:** {moeda_br(row.get('Valor_Real', 0))}")
+                        st.markdown(f"**Número NF:** `{html.escape(str(row.get('Numero_NF', '') or '—'))}`")
+                        st.markdown(f"**Chave NF:** `{html.escape(str(row.get('Chave_NF', '') or '—'))}`")
+                        st.markdown(f"**Status:** {html.escape(str(row.get('Status_Consulta_NF', '') or '—'))}")
+                        link_origem = str(row.get('Link_Origem_NF', '') or '')
+                        link_consulta = str(row.get('Link_Consulta_NF', '') or '')
+                        if link_origem:
+                            st.link_button('🔗 Link original do balancete', link_origem, width='stretch')
+                        if link_consulta and link_consulta != link_origem:
+                            st.link_button('🔗 Link de consulta/documento', link_consulta, width='stretch')
+            
+            if len(filtro) > MAX_EXP:
+                st.caption(f'Mostrando {MAX_EXP} de {len(filtro)} itens. Refine a busca para ver mais.')
 
 with aba_mov:
     st.markdown('<div class="section-title">Movimentações Analíticas</div>', unsafe_allow_html=True)
