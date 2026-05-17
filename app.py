@@ -1450,6 +1450,19 @@ with aba_mov:
     if df_mov_f.empty:
         st.info('Nenhuma movimentação encontrada para o filtro atual.')
     else:
+        st.markdown('<div class="section-title" style="margin-bottom:0.5rem">Movimentação Analítica por Conta</div>', unsafe_allow_html=True)
+        if {'Mes_Ano', 'Conta', 'Tipo_Movimento', 'Valor_Entrada', 'Valor_Saida', 'Valor_Transferencia'}.issubset(df_mov_f.columns):
+            grp_all = df_mov_f.groupby(['Mes_Ano', 'Conta', 'Tipo_Movimento'], dropna=False)[['Valor_Entrada', 'Valor_Saida', 'Valor_Transferencia']].sum().reset_index()
+            grp_all['Valor'] = grp_all.apply(lambda row: row['Valor_Entrada'] if row['Tipo_Movimento'] == 'Entrada' else (row['Valor_Saida'] if row['Tipo_Movimento'] == 'Saída' else row['Valor_Transferencia']), axis=1)
+            contas = sorted(grp_all['Conta'].dropna().astype(str).unique().tolist())
+            contas_sel = st.multiselect('Filtrar contas', contas, default=[], key='contas_mov_chart', placeholder='Todas as contas')
+            contas_filtro = contas_sel if contas_sel else contas
+            grp = grp_all[grp_all['Conta'].astype(str).isin(contas_filtro)]
+            n_contas = len(contas_filtro)
+            fig = px.bar(grp, x='Mes_Ano', y='Valor', color='Tipo_Movimento', facet_col='Conta', facet_col_wrap=min(3, n_contas), height=260 * ((n_contas - 1) // 3 + 2), title='Movimentação analítica por conta', color_discrete_map={'Entrada': COR_ENTRADA, 'Saída': COR_SAIDA, 'Transferência': COR_TRANSFERENCIA})
+            formatar_fig(fig, height=260 * ((n_contas - 1) // 3 + 2), moeda=True)
+            st.plotly_chart(fig, width='stretch')
+        
         if {'Categoria'}.issubset(df_mov_f.columns):
             cats = ['Todos'] + sorted(df_mov_f['Categoria'].dropna().astype(str).unique().tolist())
             cat_sel = st.selectbox('Detalhar categoria/despesa (ex.: obra, manutenção, serviços)', cats)
@@ -1498,20 +1511,6 @@ with aba_mov:
             if st.button(f'Mostrar mais {step} itens ({rest} restantes)', key='mov_mostrar_mais', use_container_width=True):
                 st.session_state['mov_limit'] += step
                 st.rerun()
-        
-        st.markdown('<br>', unsafe_allow_html=True)
-        st.markdown('<div class="section-title" style="margin-top:2.5rem">Movimentação Analítica por Conta</div>', unsafe_allow_html=True)
-        if {'Mes_Ano', 'Conta', 'Tipo_Movimento', 'Valor_Entrada', 'Valor_Saida', 'Valor_Transferencia'}.issubset(df_mov_f.columns):
-            grp_all = df_mov_f.groupby(['Mes_Ano', 'Conta', 'Tipo_Movimento'], dropna=False)[['Valor_Entrada', 'Valor_Saida', 'Valor_Transferencia']].sum().reset_index()
-            grp_all['Valor'] = grp_all.apply(lambda row: row['Valor_Entrada'] if row['Tipo_Movimento'] == 'Entrada' else (row['Valor_Saida'] if row['Tipo_Movimento'] == 'Saída' else row['Valor_Transferencia']), axis=1)
-            contas = sorted(grp_all['Conta'].dropna().astype(str).unique().tolist())
-            contas_sel = st.multiselect('Filtrar contas', contas, default=[], key='contas_mov_chart', placeholder='Todas as contas')
-            contas_filtro = contas_sel if contas_sel else contas
-            grp = grp_all[grp_all['Conta'].astype(str).isin(contas_filtro)]
-            n_contas = len(contas_filtro)
-            fig = px.bar(grp, x='Mes_Ano', y='Valor', color='Tipo_Movimento', facet_col='Conta', facet_col_wrap=min(3, n_contas), height=260 * ((n_contas - 1) // 3 + 2), title='Movimentação analítica por conta', color_discrete_map={'Entrada': COR_ENTRADA, 'Saída': COR_SAIDA, 'Transferência': COR_TRANSFERENCIA})
-            formatar_fig(fig, height=260 * ((n_contas - 1) // 3 + 2), moeda=True)
-            st.plotly_chart(fig, width='stretch')
 
 with aba_cob:
     st.markdown('<div class="section-title">Composição das Cobranças</div>', unsafe_allow_html=True)
