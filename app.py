@@ -1122,17 +1122,14 @@ if not df_mov.empty:
         df_mov_f = df_mov_f[df_mov_f['Conta'].astype(str).isin(contas_sel)]
     if categorias_sel:
         df_mov_f = df_mov_f[df_mov_f['Categoria'].astype(str).isin(categorias_sel)]
-df_cob_f = df_cob.copy()
-if not df_cob.empty and meses_sel:
-    df_cob_f = df_cob_f[df_cob_f['Mes_Ano'].astype(str).isin(meses_sel)]
-
+ 
 receitas = float(df_bal_f['Total_Receitas'].fillna(0).sum()) if not df_bal_f.empty and 'Total_Receitas' in df_bal_f.columns else 0.0
 despesas = float(df_bal_f['Total_Despesas'].fillna(0).sum()) if not df_bal_f.empty and 'Total_Despesas' in df_bal_f.columns else 0.0
 resultado = float(df_bal_f['Movimento_Liquido'].fillna(0).sum()) if not df_bal_f.empty and 'Movimento_Liquido' in df_bal_f.columns else (receitas - despesas)
 saldo_final = float(df_bal_f['Saldo_Final'].dropna().iloc[-1]) if not df_bal_f.empty and 'Saldo_Final' in df_bal_f.columns and not df_bal_f['Saldo_Final'].dropna().empty else 0.0
 qtd_pdfs = len(listar_pdfs())
 qtd_mov = len(df_mov_f) if not df_mov_f.empty else 0
-qtd_cob = len(df_cob_f) if not df_cob_f.empty else 0
+qtd_cob = len(df_cob) if not df_cob.empty else 0
 qtd_alertas = int((df_mov_f[SCORE_COL].fillna(0) >= 40).sum()) if not df_mov_f.empty and SCORE_COL in df_mov_f.columns else 0
 df_nf_f = df_mov_f[df_mov_f['Link_NF'].fillna('').astype(str).str.len() > 0].copy() if not df_mov_f.empty and 'Link_NF' in df_mov_f.columns else pd.DataFrame()
 qtd_nf = len(df_nf_f) if not df_nf_f.empty else 0
@@ -1157,9 +1154,9 @@ if alertas_div:
     if len(alertas_div) > 5:
         st.caption(f'+ {len(alertas_div) - 5} outras divergências detectadas.')
 
-tab_labels = ['📈 Visão Executiva', '🤖 Assistente IA', '💰 Balanço', '🧩 Categorias', '🧾 Notas Fiscais', '🔎 Movimentações', '🏷️ Cobranças', '🌐 HTMLs', '📥 Downloads']
+tab_labels = ['📈 Visão Executiva', '🤖 Assistente IA', '💰 Balanço', '🧩 Categorias', '🧾 Notas Fiscais', '🔎 Movimentações', '🌐 HTMLs', '📥 Downloads']
 tabs = st.tabs(tab_labels)
-aba_exec, aba_ia, aba_balanco, aba_cat, aba_nf, aba_mov, aba_cob, aba_dash, aba_dl = tabs
+aba_exec, aba_ia, aba_balanco, aba_cat, aba_nf, aba_mov, aba_dash, aba_dl = tabs
 
 with aba_exec:
     r1c1, r1c2 = st.columns(2)
@@ -1318,9 +1315,9 @@ def encontrar_imagem_divergente(row):
 
 with aba_ia:
     st.markdown('<div class="section-title">Assistente IA para análise da auditoria</div><div class="section-sub">Use como um copiloto analítico: peça resumo executivo, riscos, prioridades, fornecedores relevantes ou explicações sobre divergências.</div>', unsafe_allow_html=True)
-    contexto_ia = resumo_para_ia(df_bal_f, df_cat_f, df_mov_f, df_cob_f)
+    contexto_ia = resumo_para_ia(df_bal_f, df_cat_f, df_mov_f, df_cob)
     st.markdown('<div class="ai-card"><strong>Leitura automática dos dados filtrados</strong><div class="ai-muted">Os pontos abaixo são gerados localmente, mesmo sem chave de API.</div></div>', unsafe_allow_html=True)
-    for insight in insights_locais(df_bal_f, df_cat_f, df_mov_f, df_cob_f):
+    for insight in insights_locais(df_bal_f, df_cat_f, df_mov_f, df_cob):
         st.markdown(f'<div class="alert-card">{html.escape(insight)}</div>', unsafe_allow_html=True)
 
     with st.expander('Contexto que será enviado para a IA', expanded=False):
@@ -1343,7 +1340,7 @@ with aba_ia:
         with st.spinner('Analisando os dados filtrados...'):
             resposta, erro = chamar_modelo_ia(pergunta, contexto_ia, historico_anterior)
         if erro and not resposta:
-            resposta = f'{erro}\n\nEnquanto a IA generativa não está configurada, use estes insights locais:\n' + '\n'.join(f'- {item}' for item in insights_locais(df_bal_f, df_cat_f, df_mov_f, df_cob_f))
+            resposta = f'{erro}\n\nEnquanto a IA generativa não está configurada, use estes insights locais:\n' + '\n'.join(f'- {item}' for item in insights_locais(df_bal_f, df_cat_f, df_mov_f, df_cob))
         st.session_state['chat_ia_auditoria'].append({'role': 'assistant', 'content': resposta or 'Não consegui gerar uma resposta para esta pergunta.'})
         st.rerun()
 
@@ -1645,43 +1642,6 @@ with aba_mov:
                     st.session_state[page_key] = min(total_pages, page + 1)
                     st.rerun()
 
-with aba_cob:
-    st.markdown('<div class="section-title">Composição das Cobranças</div>', unsafe_allow_html=True)
-    if df_cob_f.empty:
-        st.info('Nenhum registro de cobrança disponível. Execute a auditoria pelo painel **Admin** para gerar os dados de composição das cobranças.')
-    else:
-        if {'Bloco', 'Valor'}.issubset(df_cob_f.columns):
-            fig = px.bar(df_cob_f.groupby('Bloco', dropna=False)['Valor'].sum().reset_index(), x='Bloco', y='Valor', height=420, title='Valor por bloco', color_discrete_sequence=[COR_CIANO])
-            formatar_fig(fig, height=420, moeda=True)
-            st.plotly_chart(fig, width='stretch')
-
-        if 'Vencimento' in df_cob_f.columns and 'Data_Liquidacao' in df_cob_f.columns:
-            st.markdown('<div class="section-title">Aging de Inadimplência</div>', unsafe_allow_html=True)
-            hoje = pd.Timestamp.now().normalize()
-            df_cob_aging = df_cob_f.copy()
-            if 'Vencimento' in df_cob_f.columns:
-                df_cob_aging['Vencimento'] = pd.to_datetime(df_cob_aging['Vencimento'], errors='coerce')
-            if 'Data_Liquidacao' in df_cob_f.columns:
-                df_cob_aging['Data_Liquidacao'] = pd.to_datetime(df_cob_aging['Data_Liquidacao'], errors='coerce')
-            nao_pagas = df_cob_aging[df_cob_aging['Data_Liquidacao'].isna()].copy()
-            if not nao_pagas.empty:
-                nao_pagas['Dias_Atraso'] = (hoje - nao_pagas['Vencimento']).dt.days
-                faixas = [0, 30, 60, 90, 180, 9999]
-                rotulos = ['A vencer (≤30d)', '30-59 dias', '60-89 dias', '90-179 dias', '180+ dias']
-                nao_pagas['Faixa_Aging'] = pd.cut(nao_pagas['Dias_Atraso'].clip(lower=0), bins=faixas, labels=rotulos, right=False)
-                aging = nao_pagas.groupby('Faixa_Aging', observed=False).agg(Quantidade=('Valor', 'count'), Total=('Valor', 'sum')).reset_index()
-                aging.columns = ['Faixa', 'Qtd', 'Total']
-                st.dataframe(aging, width='stretch', hide_index=True, column_config={'Total': st.column_config.NumberColumn(format='R$ %.2f')})
-                fig_aging = px.bar(aging, x='Faixa', y='Total', height=360, title='Distribuição da inadimplência por faixa de atraso', color_discrete_sequence=[COR_SAIDA], text_auto='.2s')
-                formatar_fig(fig_aging, height=360, moeda=True)
-                st.plotly_chart(fig_aging, width='stretch')
-            else:
-                st.success('Nenhum registro em aberto — todas as cobranças foram liquidadas.')
-
-        try:
-            st.dataframe(sanitizar_arrow(preparar_exibicao(df_cob_f)), width='stretch', hide_index=True)
-        except Exception:
-            st.table(preparar_exibicao(df_cob_f).astype(str).head(50))
 with aba_dash:
     st.markdown('<div class="section-title">Dashboards HTML do motor</div>', unsafe_allow_html=True)
     dashs = dashboards_existentes()
@@ -1699,7 +1659,7 @@ with aba_dl:
     
     if st.button('📄 Gerar PDF Resumo', key='btn_gerar_pdf', use_container_width=True, type='primary'):
         prog = st.progress(0, text='Gerando PDF...')
-        pdf_bytes = gerar_pdf_resumo(df_bal_f, df_cat_f, df_mov_f, df_cob_f, df_nf_f, prog=prog)
+        pdf_bytes = gerar_pdf_resumo(df_bal_f, df_cat_f, df_mov_f, df_cob, df_nf_f, prog=prog)
         st.session_state['pdf_resumo_bytes'] = pdf_bytes
         st.rerun()
     if st.session_state.get('pdf_resumo_bytes'):
