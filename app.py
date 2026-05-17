@@ -1200,6 +1200,42 @@ with aba_cat:
     except Exception:
         st.table(preparar_exibicao(df_cat_f).astype(str).head(50))
 
+@st.dialog("Detalhes do item", width="large")
+def detail_dialog():
+    row = st.session_state.get('popup_row', {})
+    tem_img = st.session_state.get('popup_tem_img', False)
+    c1, c2 = st.columns([1.2, 1])
+    with c1:
+        p = str(row.get('Link_NF', '') or '')
+        if tem_img and Path(p).exists():
+            st.image(p, caption=Path(p).name, width='stretch')
+        else:
+            st.info('Imagem não disponível')
+    with c2:
+        st.markdown(f"**Fornecedor:** {html.escape(str(row.get('Fornecedor', '') or '—'))}")
+        st.markdown(f"**Descrição:** {html.escape(str(row.get('Descricao', '') or '—'))}")
+        st.markdown(f"**Valor:** {moeda_br(row.get('Valor_Real', 0))}")
+        if row.get('Numero_NF'):
+            st.markdown(f"**Número NF:** `{html.escape(str(row['Numero_NF']))}`")
+        if row.get('Chave_NF'):
+            st.markdown(f"**Chave NF:** `{html.escape(str(row['Chave_NF']))}`")
+        if row.get('Status_Consulta_NF'):
+            st.markdown(f"**Status:** {html.escape(str(row['Status_Consulta_NF']))}")
+        if row.get('Categoria'):
+            st.markdown(f"**Categoria:** {html.escape(str(row['Categoria']))}")
+        if row.get('Conta'):
+            st.markdown(f"**Conta:** {html.escape(str(row['Conta']))}")
+        if row.get('Tipo_Movimento'):
+            st.markdown(f"**Tipo:** {html.escape(str(row['Tipo_Movimento']))}")
+        link_origem = str(row.get('Link_Origem_NF', '') or '')
+        link_consulta = str(row.get('Link_Consulta_NF', '') or '')
+        if link_origem:
+            st.link_button('🔗 Link original do balancete', link_origem, width='stretch')
+        if link_consulta and link_consulta != link_origem:
+            st.link_button('🔗 Link de consulta/documento', link_consulta, width='stretch')
+    if st.button("Fechar"):
+        st.rerun()
+
 with aba_nf:
     st.markdown('<div class="section-title">Notas fiscais e comprovantes vinculados</div><div class="section-sub">Imagens extraídas dos PDFs, número da nota, chave de acesso, status da consulta e vínculo por valor com a movimentação.</div>', unsafe_allow_html=True)
     if df_nf_f.empty:
@@ -1219,30 +1255,27 @@ with aba_nf:
             formatar_fig(fig, height=360)
             st.plotly_chart(fig, width='stretch')
 
-        df_nf_view = df_nf_f.reset_index(drop=True).copy()
-        df_nf_view['_forn'] = df_nf_view.get('Fornecedor', pd.Series(['']*len(df_nf_view))).apply(
-            lambda x: str(x).strip() if pd.notna(x) and str(x).strip() != '' else 'Sem fornecedor')
-        df_nf_view['_desc'] = df_nf_view.get('Descricao', pd.Series(['']*len(df_nf_view))).apply(
-            lambda x: str(x).strip()[:80] if pd.notna(x) else '')
-        df_nf_view['_tem_img'] = df_nf_view.get('Link_NF', pd.Series(['']*len(df_nf_view))).apply(
-            lambda x: bool(x) and Path(str(x)).exists())
-        df_nf_view['🔍'] = '🔍'
-        
         busca = st.text_input('🔍 Buscar nota/despesa', placeholder='Filtrar por fornecedor, descrição...')
-        filtro = df_nf_view
-        if busca:
-            filtro = df_nf_view[df_nf_view['_forn'].str.lower().str.contains(busca.lower()) |
-                                df_nf_view['_desc'].str.lower().str.contains(busca.lower())]
+        filtro = df_nf_f if not busca else df_nf_f[df_nf_f.apply(
+            lambda r: busca.lower() in str(r.get('Data', '')).lower() or
+                      busca.lower() in str(r.get('Fornecedor', '')).lower() or
+                      busca.lower() in str(r.get('Descricao', '')).lower(), axis=1)]
         
-        st.caption(f'{len(filtro)} itens  ·  {filtro["_tem_img"].sum()} com imagem')
+        st.caption(f'{len(filtro)} itens')
         
         st.divider()
         st.markdown('<div class="section-title">Tabela completa</div>', unsafe_allow_html=True)
         
-        nf_table = df_nf_f.sort_values('Valor_Real', ascending=False).head(50).reset_index(drop=True)
-        
-        if 'nf_expand_idx' not in st.session_state:
-            st.session_state['nf_expand_idx'] = -1
+        ordem_nf = st.selectbox('Ordenar por', ['Valor (maior → menor)', 'Valor (menor → maior)', 'Data (recente → antiga)', 'Data (antiga → recente)', 'Fornecedor (A → Z)'], key='ordem_nf')
+        nf_table = df_nf_f.copy()
+        nf_table = nf_table if not busca else nf_table[nf_table.apply(
+            lambda r: busca.lower() in str(r.get('Data', '')).lower() or
+                      busca.lower() in str(r.get('Fornecedor', '')).lower() or
+                      busca.lower() in str(r.get('Descricao', '')).lower(), axis=1)]
+        sort_map = {'Valor (maior → menor)': ('Valor_Real', False), 'Valor (menor → maior)': ('Valor_Real', True), 'Data (recente → antiga)': ('Data', False), 'Data (antiga → recente)': ('Data', True), 'Fornecedor (A → Z)': ('Fornecedor', True)}
+        if ordem_nf in sort_map and sort_map[ordem_nf][0] in nf_table.columns:
+            nf_table = nf_table.sort_values(sort_map[ordem_nf][0], ascending=sort_map[ordem_nf][1])
+        nf_table = nf_table.head(50).reset_index(drop=True)
         
         hdr = st.columns([0.5, 1.3, 2.2, 1, 2])
         hdr[0].markdown('**🔍**')
@@ -1257,38 +1290,13 @@ with aba_nf:
             c = st.columns([0.5, 1.3, 2.2, 1, 2])
             btn_key = f'nf_exp_{idx}'
             if c[0].button('🔍', key=btn_key, help='Ver detalhes'):
-                st.session_state['nf_expand_idx'] = idx
-                st.rerun()
+                st.session_state['popup_row'] = nf_table.iloc[idx].to_dict()
+                st.session_state['popup_tem_img'] = bool(nf_table.iloc[idx].get('Link_NF')) and Path(str(nf_table.iloc[idx].get('Link_NF', ''))).exists()
+                detail_dialog()
             c[1].write(str(r.get('Data', '') or ''))
             c[2].write(html.escape(str(r.get('Fornecedor', '') or ''))[:45])
             c[3].write(moeda_br(r.get('Valor_Real', 0)))
             c[4].write(html.escape(str(r.get('Descricao', '') or ''))[:45])
-        
-        if st.session_state['nf_expand_idx'] >= 0 and st.session_state['nf_expand_idx'] < len(nf_table):
-            row = nf_table.iloc[st.session_state['nf_expand_idx']]
-            tem_img = bool(row.get('Link_NF')) and Path(str(row.get('Link_NF', ''))).exists()
-            label = f"{'🖼️' if tem_img else '📄'} {str(row.get('Data', ''))} | {html.escape(str(row.get('Fornecedor', '') or '—'))} | {moeda_br(row.get('Valor_Real', 0))}"
-            with st.expander(label, expanded=True):
-                c1, c2 = st.columns([1.2, 1])
-                with c1:
-                    caminho_img = str(row.get('Link_NF', '') or '')
-                    if tem_img:
-                        st.image(caminho_img, caption=Path(caminho_img).name, width='stretch')
-                    else:
-                        st.info('Imagem não disponível (execute a auditoria para gerar)')
-                with c2:
-                    st.markdown(f"**Fornecedor:** {html.escape(str(row.get('Fornecedor', '')))}")
-                    st.markdown(f"**Descrição:** {html.escape(str(row.get('Descricao', '')))}")
-                    st.markdown(f"**Valor:** {moeda_br(row.get('Valor_Real', 0))}")
-                    st.markdown(f"**Número NF:** `{html.escape(str(row.get('Numero_NF', '') or '—'))}`")
-                    st.markdown(f"**Chave NF:** `{html.escape(str(row.get('Chave_NF', '') or '—'))}`")
-                    st.markdown(f"**Status:** {html.escape(str(row.get('Status_Consulta_NF', '') or '—'))}")
-                    link_origem = str(row.get('Link_Origem_NF', '') or '')
-                    link_consulta = str(row.get('Link_Consulta_NF', '') or '')
-                    if link_origem:
-                        st.link_button('🔗 Link original do balancete', link_origem, width='stretch')
-                    if link_consulta and link_consulta != link_origem:
-                        st.link_button('🔗 Link de consulta/documento', link_consulta, width='stretch')
 
 with aba_mov:
     st.markdown('<div class="section-title">Movimentações Analíticas</div>', unsafe_allow_html=True)
@@ -1311,14 +1319,19 @@ with aba_mov:
             cats = ['Todos'] + sorted(df_mov_f['Categoria'].dropna().astype(str).unique().tolist())
             cat_sel = st.selectbox('Detalhar categoria/despesa (ex.: obra, manutenção, serviços)', cats)
             detalhes = df_mov_f if cat_sel == 'Todos' else df_mov_f[df_mov_f['Categoria'].astype(str) == cat_sel]
-            detalhes = detalhes.sort_values('Valor_Real', ascending=False).head(50)
         else:
-            detalhes = df_mov_f.sort_values('Valor_Real', ascending=False).head(50)
+            detalhes = df_mov_f.copy()
+        
+        ordem_mov = st.selectbox('Ordenar por', ['Valor (maior → menor)', 'Valor (menor → maior)', 'Data (recente → antiga)', 'Data (antiga → recente)', 'Fornecedor (A → Z)'], key='ordem_mov')
+        busca_mov_tab = st.text_input('Filtrar na tabela', placeholder='Fornecedor, descrição...', key='busca_mov_tab')
+        if busca_mov_tab:
+            detalhes = detalhes[detalhes.apply(lambda r: busca_mov_tab.lower() in str(r.get('Data', '')).lower() or busca_mov_tab.lower() in str(r.get('Fornecedor', '')).lower() or busca_mov_tab.lower() in str(r.get('Descricao', '')).lower(), axis=1)]
+        sort_map = {'Valor (maior → menor)': ('Valor_Real', False), 'Valor (menor → maior)': ('Valor_Real', True), 'Data (recente → antiga)': ('Data', False), 'Data (antiga → recente)': ('Data', True), 'Fornecedor (A → Z)': ('Fornecedor', True)}
+        if ordem_mov in sort_map and sort_map[ordem_mov][0] in detalhes.columns:
+            detalhes = detalhes.sort_values(sort_map[ordem_mov][0], ascending=sort_map[ordem_mov][1])
+        detalhes = detalhes.head(50).reset_index(drop=True)
         
         cols_mov = [c for c in ['Data', 'Fornecedor', 'Descricao', 'Valor_Real', 'Categoria', 'Conta', 'Tipo_Movimento'] if c in df_mov_f.columns]
-        
-        if 'mov_expand_idx' not in st.session_state:
-            st.session_state['mov_expand_idx'] = -1
         
         hdr = st.columns([0.5, 1.3, 2.2, 1, 2])
         hdr[0].markdown('**🔍**')
@@ -1333,36 +1346,14 @@ with aba_mov:
             c = st.columns([0.5, 1.3, 2.2, 1, 2])
             btn_key = f'mov_exp_{idx}'
             if c[0].button('🔍', key=btn_key, help='Ver detalhes'):
-                st.session_state['mov_expand_idx'] = idx
-                st.rerun()
+                st.session_state['popup_row'] = detalhes.iloc[idx].to_dict()
+                st.session_state['popup_tem_img'] = bool(detalhes.iloc[idx].get('Link_NF')) and Path(str(detalhes.iloc[idx].get('Link_NF', ''))).exists()
+                detail_dialog()
             c[1].write(str(r.get('Data', '') or ''))
             c[2].write(html.escape(str(r.get('Fornecedor', '') or ''))[:45])
             c[3].write(moeda_br(r.get('Valor_Real', 0)))
             c[4].write(html.escape(str(r.get('Descricao', '') or ''))[:45])
-        
-        if st.session_state['mov_expand_idx'] >= 0 and st.session_state['mov_expand_idx'] < len(detalhes):
-            row = detalhes.iloc[st.session_state['mov_expand_idx']]
-            tem_img = bool(row.get('Link_NF')) and Path(str(row.get('Link_NF', ''))).exists()
-            label = f"{'🖼️' if tem_img else '📄'} {str(row.get('Data', ''))} | {html.escape(str(row.get('Fornecedor', '') or '—'))} | {moeda_br(row.get('Valor_Real', 0))}"
-            with st.expander(label, expanded=True):
-                c1, c2 = st.columns([1.2, 1])
-                with c1:
-                    p = str(row.get('Link_NF', '') or '')
-                    if tem_img:
-                        st.image(p, caption=Path(p).name, width='stretch')
-                    else:
-                        st.info('Imagem não disponível')
-                with c2:
-                    st.markdown(f"**Fornecedor:** {html.escape(str(row.get('Fornecedor', '')))}")
-                    st.markdown(f"**Descrição:** {html.escape(str(row.get('Descricao', '')))}")
-                    st.markdown(f"**Valor:** {moeda_br(row.get('Valor_Real', 0))}")
-                    st.markdown(f"**Categoria:** {html.escape(str(row.get('Categoria', '') or '—'))}")
-                    st.markdown(f"**Conta:** {html.escape(str(row.get('Conta', '') or '—'))}")
-                    st.markdown(f"**Tipo:** {html.escape(str(row.get('Tipo_Movimento', '') or '—'))}")
-                    lnk = str(row.get('Link_Origem_NF', '') or '')
-                    if lnk:
-                        st.link_button('🔗 Link original', lnk, width='stretch')
-    
+
 with aba_cob:
     st.markdown('<div class="section-title">Composição das Cobranças</div>', unsafe_allow_html=True)
     if not df_cob_f.empty and {'Bloco', 'Valor'}.issubset(df_cob_f.columns):
