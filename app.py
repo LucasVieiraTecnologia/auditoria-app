@@ -879,7 +879,10 @@ def executar_runner_com_log(prog=None) -> tuple[bool, int | None, str]:
             if prog is not None:
                 def cb(pct, msg):
                     prog.progress(min(pct, 100), text=msg)
-                retorno = runner.main(progress_callback=cb)
+                try:
+                    retorno = runner.main(progress_callback=cb)
+                except TypeError:
+                    retorno = runner.main()
             else:
                 retorno = runner.main()
         log_texto = buffer_out.getvalue()
