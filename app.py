@@ -34,6 +34,8 @@ import rodar_auditoria_script as runner
 # ==========================================
 import logs_acesso
 
+st.set_page_config(page_title='Auditoria Inteligente de Condomínios', page_icon='🏢', layout='wide', initial_sidebar_state='expanded')
+
 def hash_password(password: str) -> str:
     # Generate salt and hash password using bcrypt
     salt = bcrypt.gensalt()
@@ -240,181 +242,96 @@ def init_auth():
 def login_screen():
     st.markdown("""
     <style>
-    /* Full-screen background video */
     .stApp {
-        position: relative;
-        overflow: hidden;
+        background: linear-gradient(135deg, #0a0f1e 0%, #0f172a 40%, #1a1f36 70%, #0f172a 100%);
     }
-    
-    /* Background video container */
-    .video-background {
+    .stApp::before {
+        content: '';
         position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        z-index: -1;
-        opacity: 0.7;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background:
+            radial-gradient(ellipse at 20% 50%, rgba(37,99,235,0.12) 0%, transparent 60%),
+            radial-gradient(ellipse at 80% 20%, rgba(6,182,212,0.08) 0%, transparent 50%),
+            radial-gradient(ellipse at 50% 80%, rgba(99,102,241,0.06) 0%, transparent 50%);
+        pointer-events: none;
+        z-index: 0;
     }
-    
-    /* Overlay to darken video and improve text readability */
-    .video-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.4);
-        z-index: -1;
-    }
-    
-    /* Login container - centered on screen */
-    .login-container {
+    .block-container {
+        max-width: 500px !important;
+        padding-top: 2.5rem !important;
         position: relative;
         z-index: 1;
-        max-width: 400px;
-        margin: 0 auto;
-        padding: 40px 20px;
+    }
+    .login-logo {
         text-align: center;
-        color: white;
+        font-size: 3.5rem;
+        margin-bottom: 0;
     }
-    
     .login-title {
-        color: #ffffff;
-        font-size: 28px;
+        text-align: center;
+        color: #f1f5f9;
+        font-size: 2rem;
         font-weight: 800;
-        margin-bottom: 24px;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        letter-spacing: -0.03em;
+        margin-bottom: 0.25rem;
     }
-    
-    .login-subtitle {
-        color: #e2e8f0;
-        font-size: 16px;
-        margin-bottom: 32px;
-        text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    .login-sub {
+        text-align: center;
+        color: #94a3b8;
+        font-size: 0.9rem;
+        margin-bottom: 1.5rem;
     }
-    
-    /* Form styling */
-    .login-form {
-        background: rgba(255, 255, 255, 0.9);
-        padding: 32px;
-        border-radius: 16px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-        backdrop-filter: blur(10px);
+    .stForm {
+        background: rgba(255,255,255,0.96);
+        padding: 2.5rem 2rem;
+        border-radius: 24px;
+        box-shadow: 0 24px 70px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.06);
     }
-    
-    .stTextInput > div > div > input {
-        border-radius: 10px;
-        border: 2px solid #e2e8f0;
-        padding: 12px 16px;
-        font-size: 16px;
-        transition: all 0.3s ease;
-        background: rgba(255,255,255,0.8);
+    .stTextInput {
+        margin-bottom: 0.5rem;
     }
-    
-    .stTextInput > div > div > input:focus {
-        border-color: #2563eb;
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-        background: white;
+    .stTextInput input {
+        border-radius: 12px !important;
+        border: 2px solid #e2e8f0 !important;
+        padding: 14px 16px !important;
+        font-size: 15px !important;
+        background: #f8fafc !important;
+        transition: all 0.2s ease !important;
     }
-    
-    .stButton > button {
+    .stTextInput input:focus {
+        border-color: #2563eb !important;
+        box-shadow: 0 0 0 4px rgba(37,99,235,0.12) !important;
+        background: #fff !important;
+    }
+    .stButton button {
         width: 100%;
         border-radius: 12px;
-        border: none;
         background: linear-gradient(135deg, #2563eb, #1d4ed8);
         color: white;
         font-weight: 700;
         font-size: 16px;
         padding: 14px;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+        border: none;
+        transition: all 0.2s ease;
+        margin-top: 0.75rem;
     }
-    
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+    .stButton button:hover {
         background: linear-gradient(135deg, #1d4ed8, #1e40af);
+        transform: translateY(-1px);
+        box-shadow: 0 8px 20px rgba(37,99,235,0.3);
     }
-    
-    .stButton > button:active {
+    .stButton button:active {
         transform: translateY(0);
     }
-    
-    .login-error {
-        color: #dc2626;
-        background: #fee2e2;
-        padding: 12px;
-        border-radius: 8px;
-        margin-top: 16px;
-        text-align: center;
-        font-size: 14px;
-    }
-    
-    /* Responsive design */
-    @media (max-width: 768px) {
-        .login-container {
-            padding: 20px;
-        }
-        .login-form {
-            padding: 24px;
-        }
-        .login-title {
-            font-size: 24px;
-        }
+    .st-emotion-cache-1jicfl2 {
+        padding-top: 1rem;
     }
     </style>
     """, unsafe_allow_html=True)
     
-    # Background video
-    try:
-        video_file = open('img/Candelaria.mp4', 'rb')
-        video_bytes = video_file.read()
-        st.markdown(
-            f'''
-            <video autoplay muted loop playsinline style="width: 100%; height: 100%; object-fit: cover; position: fixed; top: 0; left: 0; z-index: -2;" 
-                   playbackRate="0.5">
-                <source src="data:video/mp4;base64,{base64.b64encode(video_bytes).decode()}" type="video/mp4">
-            </video>
-            ''',
-            unsafe_allow_html=True
-        )
-        
-        # Dark overlay for better text readability
-        st.markdown(
-            '''
-            <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); z-index: -1;"></div>
-            ''',
-            unsafe_allow_html=True
-        )
-    except FileNotFoundError:
-        # Fallback to gradient background if video not found
-        st.markdown("""
-        <style>
-        .stApp {
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
-        }
-        </style>
-        """, unsafe_allow_html=True)
-        st.warning("Vídeo Candelaria não encontrado. Usando fundo degradê como fallback.")
-    except Exception as e:
-        # Fallback to gradient background on error
-        st.markdown("""
-        <style>
-        .stApp {
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
-        }
-        </style>
-        """, unsafe_allow_html=True)
-        st.error(f"Erro ao carregar vídeo: {str(e)}. Usando fundo degradê como fallback.")
-    
-    # Login form container
-    st.markdown('<div class="login-container">', unsafe_allow_html=True)
-    st.markdown('<div class="login-title">🏢 Auditoria Inteligente</div>', unsafe_allow_html=True)
-    st.markdown('<div class="login-subtitle">Sistema de gestão condominial avançado</div>', unsafe_allow_html=True)
-    
-    st.markdown('<div class="login-form">', unsafe_allow_html=True)
+    st.markdown('<div class="login-logo">🏢</div>', unsafe_allow_html=True)
+    st.markdown('<div class="login-title">Condomínio Candelária</div>', unsafe_allow_html=True)
+    st.markdown('<div class="login-sub">Sistema de gestão condominial avançado</div>', unsafe_allow_html=True)
     
     with st.form('login_form'):
         username = st.text_input('Usuário', placeholder='Digite seu usuário')
@@ -427,25 +344,20 @@ def login_screen():
                 st.session_state['username'] = username
                 st.session_state['user_role'] = 'admin' if username == os.getenv('APP_USERNAME', 'admin') else 'viewer'
                 
-                # Update user login info
                 users = get_all_users()
                 if username in users:
                     users[username]['last_login'] = datetime.now().isoformat()
                     users[username]['last_seen'] = datetime.now().isoformat()
                     save_all_users_to_file(users)
                 
-                # Set cookies for persistent login (valid for 7 days)
                 st.query_params.auth = 'true'
                 st.query_params.user = username
                 
                 logs_acesso.log_acesso(username, 'LOGIN', detalhes='Login realizado com sucesso')
                 st.rerun()
             else:
-                st.markdown('<div class="login-error">Usuário ou senha inválidos</div>', unsafe_allow_html=True)
+                st.error('Usuário ou senha inválidos')
                 logs_acesso.log_acesso(username or 'desconhecido', 'LOGIN_FALHOU', detalhes='Tentativa de login falhou')
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
     
     st.stop()
 
@@ -459,8 +371,6 @@ if st.session_state.get('authenticated', False):
 
 if not st.session_state['authenticated']:
     login_screen()
-
-st.set_page_config(page_title='Auditoria Inteligente de Condomínios', page_icon='🏢', layout='wide', initial_sidebar_state='expanded')
 
 BASE_DIR = Path('.')
 PASTA_PDFS = BASE_DIR / 'ArquivosPDF'
