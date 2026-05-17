@@ -693,29 +693,36 @@ st.markdown('''<div class="hero"><div class="hero-badge">Auditoria executiva •
 with st.sidebar:
     st.markdown("""
     <style>
-    [data-testid=stSidebar] {
-        background: var(--secondary-background-color) !important;
-        border-right: 1px solid color-mix(in srgb, var(--text-color) 10%, transparent) !important;
+    div[data-testid="stSidebar"], div[data-testid="stSidebarContent"] {
+        background: #0f172a !important;
     }
-    [data-testid=stSidebar] .stApp {
+    div[data-testid="stSidebar"] .stApp {
         background: transparent !important;
     }
-    section[data-testid="stSidebar"] {
-        background: var(--secondary-background-color) !important;
+    div[data-testid="stSidebar"] * {
+        color: #e2e8f0 !important;
+    }
+    div[data-testid="stSidebar"] .st-b7,
+    div[data-testid="stSidebar"] .st-emotion-cache-1aej7m3 {
+        color: #e2e8f0 !important;
+    }
+    div[data-testid="stSidebar"] label,
+    div[data-testid="stSidebar"] .st-cb,
+    div[data-testid="stSidebar"] .st-c0 {
+        color: #94a3b8 !important;
     }
     .sidebar-section-title {
         font-size: 0.72rem;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.08em;
-        color: var(--text-color);
-        opacity: 0.5;
+        color: #64748b;
         margin-bottom: 0.5rem;
         padding: 0 0.25rem;
     }
     .sidebar-card {
-        background: color-mix(in srgb, var(--text-color) 4%, transparent);
-        border: 1px solid color-mix(in srgb, var(--text-color) 10%, transparent);
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.08);
         border-radius: 14px;
         padding: 0.75rem 1rem;
         margin-bottom: 0.5rem;
@@ -724,27 +731,26 @@ with st.sidebar:
         width: 32px;
         height: 32px;
         border-radius: 50%;
-        background: linear-gradient(135deg, var(--primary-color), color-mix(in srgb, var(--primary-color) 80%, #000));
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
         display: flex;
         align-items: center;
         justify-content: center;
         font-weight: 800;
         font-size: 0.8rem;
-        color: white;
+        color: #f8fafc !important;
         flex-shrink: 0;
     }
     .sidebar-user-name {
         font-weight: 700;
         font-size: 0.85rem;
-        color: var(--text-color);
+        color: #f1f5f9;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
     .sidebar-user-role {
         font-size: 0.7rem;
-        color: var(--text-color);
-        opacity: 0.5;
+        color: #94a3b8;
         font-weight: 600;
     }
     .sidebar-badge {
@@ -757,24 +763,24 @@ with st.sidebar:
         font-weight: 700;
     }
     .sidebar-badge-online {
-        background: color-mix(in srgb, #34d399 15%, transparent);
-        color: #34d399;
-        border: 1px solid color-mix(in srgb, #34d399 25%, transparent);
+        background: rgba(16,185,129,0.15);
+        color: #34d399 !important;
+        border: 1px solid rgba(16,185,129,0.25);
     }
     .sidebar-badge-offline {
-        background: color-mix(in srgb, #9ca3af 15%, transparent);
-        color: #9ca3af;
-        border: 1px solid color-mix(in srgb, #9ca3af 25%, transparent);
+        background: rgba(107,114,128,0.15);
+        color: #9ca3af !important;
+        border: 1px solid rgba(107,114,128,0.25);
     }
     .sidebar-badge-admin {
-        background: color-mix(in srgb, var(--primary-color) 15%, transparent);
-        color: var(--primary-color);
-        border: 1px solid color-mix(in srgb, var(--primary-color) 25%, transparent);
+        background: rgba(37,99,235,0.15);
+        color: #60a5fa !important;
+        border: 1px solid rgba(37,99,235,0.25);
     }
     .sidebar-badge-viewer {
-        background: color-mix(in srgb, #34d399 15%, transparent);
-        color: #34d399;
-        border: 1px solid color-mix(in srgb, #34d399 25%, transparent);
+        background: rgba(16,185,129,0.15);
+        color: #34d399 !important;
+        border: 1px solid rgba(16,185,129,0.25);
     }
     .sidebar-user-item {
         display: flex;
@@ -782,32 +788,30 @@ with st.sidebar:
         justify-content: space-between;
         padding: 0.5rem 0.65rem;
         border-radius: 10px;
-        background: color-mix(in srgb, var(--text-color) 3%, transparent);
-        border: 1px solid color-mix(in srgb, var(--text-color) 8%, transparent);
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.06);
         margin-bottom: 0.35rem;
     }
     .sidebar-user-item-name {
         font-weight: 600;
         font-size: 0.8rem;
-        color: var(--text-color);
+        color: #e2e8f0;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
     .sidebar-user-item-time {
         font-size: 0.65rem;
-        color: var(--text-color);
-        opacity: 0.5;
+        color: #64748b;
     }
     .sidebar-divider {
         height: 1px;
-        background: color-mix(in srgb, var(--text-color) 12%, transparent);
+        background: linear-gradient(90deg, transparent, rgba(148,163,184,0.2), transparent);
         margin: 0.75rem 0;
     }
     .sidebar-pdf-item {
         font-size: 0.75rem;
-        color: var(--text-color);
-        opacity: 0.6;
+        color: #94a3b8;
         padding: 0.2rem 0;
         white-space: nowrap;
         overflow: hidden;
@@ -815,6 +819,7 @@ with st.sidebar:
     }
     .sidebar-pdf-item::before {
         content: '•';
+        color: #475569;
         margin-right: 0.4rem;
     }
     .sidebar-log-area {
@@ -826,35 +831,35 @@ with st.sidebar:
     .sidebar-log-area::-webkit-scrollbar { width: 4px; }
     .sidebar-log-area::-webkit-scrollbar-track { background: transparent; }
     .sidebar-log-area::-webkit-scrollbar-thumb {
-        background: color-mix(in srgb, var(--text-color) 15%, transparent);
+        background: rgba(148,163,184,0.2);
         border-radius: 4px;
     }
-    [data-testid=stSidebar] .stTabs [data-baseweb=tab] {
+    div[data-testid="stSidebar"] .stTabs [data-baseweb=tab] {
         font-size: 0.7rem !important;
         padding: 0.4rem 0.5rem !important;
     }
-    [data-testid=stSidebar] .stTabs [data-baseweb=tab-list] { gap: 2px !important; }
-    [data-testid=stSidebar] .stTextInput input {
-        background: color-mix(in srgb, var(--text-color) 6%, transparent) !important;
-        border: 1px solid color-mix(in srgb, var(--text-color) 15%, transparent) !important;
+    div[data-testid="stSidebar"] .stTabs [data-baseweb=tab-list] { gap: 2px !important; }
+    div[data-testid="stSidebar"] .stTextInput input {
+        background: rgba(255,255,255,0.06) !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
         border-radius: 10px !important;
-        color: var(--text-color) !important;
+        color: #f1f5f9 !important;
         font-size: 0.82rem !important;
     }
-    [data-testid=stSidebar] .stTextInput input:focus {
-        border-color: var(--primary-color) !important;
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 20%, transparent) !important;
+    div[data-testid="stSidebar"] .stTextInput input:focus {
+        border-color: #2563eb !important;
+        box-shadow: 0 0 0 3px rgba(37,99,235,0.15) !important;
     }
-    [data-testid=stSidebar] .stSelectbox div[data-baseweb=select] > div {
-        background: color-mix(in srgb, var(--text-color) 6%, transparent) !important;
-        border: 1px solid color-mix(in srgb, var(--text-color) 15%, transparent) !important;
+    div[data-testid="stSidebar"] .stSelectbox div[data-baseweb=select] > div {
+        background: rgba(255,255,255,0.06) !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
         border-radius: 10px !important;
     }
     </style>
     """, unsafe_allow_html=True)
     
     # ── HEADER ──
-    st.markdown('<div style="display:flex;align-items:center;gap:0.6rem;padding:0.25rem 0 0.75rem 0;"><span style="font-size:1.4rem;">🏢</span><div><div style="font-weight:800;font-size:0.95rem;color:var(--text-color);">Condomínio</div><div style="font-size:0.7rem;color:var(--text-color);opacity:0.5;font-weight:600;">Candelária</div></div></div>', unsafe_allow_html=True)
+    st.markdown('<div style="display:flex;align-items:center;gap:0.6rem;padding:0.25rem 0 0.75rem 0;"><span style="font-size:1.4rem;">🏢</span><div><div style="font-weight:800;font-size:0.95rem;color:#f1f5f9;">Condomínio</div><div style="font-size:0.7rem;color:#94a3b8;font-weight:600;">Candelária</div></div></div>', unsafe_allow_html=True)
     
     # ── OPERAÇÃO (admin only) ──
     if st.session_state.get('user_role') == 'admin':
@@ -881,7 +886,7 @@ with st.sidebar:
                         st.error(f'Falha na auditoria. Código: {codigo}')
     else:
         st.markdown('<div class="sidebar-section-title">📊 Visualização</div>', unsafe_allow_html=True)
-        st.markdown('<div style="font-size:0.8rem;color:var(--text-color);opacity:0.6;padding:0.5rem 0;">Modo leitura — apenas visualização dos dados.</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size:0.8rem;color:#94a3b8;padding:0.5rem 0;">Modo leitura — apenas visualização dos dados.</div>', unsafe_allow_html=True)
     
     st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
     
@@ -968,7 +973,7 @@ with st.sidebar:
                 if st.button('🔄 Atualizar', key='refresh_users', use_container_width=True):
                     st.rerun()
             with col_count:
-                st.markdown(f'<div style="text-align:right;font-size:0.75rem;color:var(--text-color);opacity:0.5;padding-top:0.2rem;">{len(online_users)} online</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="text-align:right;font-size:0.75rem;color:#64748b;padding-top:0.2rem;">{len(online_users)} online</div>', unsafe_allow_html=True)
             
             if online_users:
                 for u, info in online_users:
