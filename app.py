@@ -158,38 +158,9 @@ def check_credentials(username: str, password: str) -> bool:
     return False
 
 def init_auth():
-    # Check for persistent login via cookies
     if 'authenticated' not in st.session_state:
-        # Try to restore from query params if available
-        query_params = st.query_params
-        authenticated_cookie = query_params.get('auth', '')
-        username_cookie = query_params.get('user', '')
-        
-        # Handle case where get() returns a list (older Streamlit versions)
-        if isinstance(authenticated_cookie, list):
-            authenticated_cookie = authenticated_cookie[0] if authenticated_cookie else ''
-        if isinstance(username_cookie, list):
-            username_cookie = username_cookie[0] if username_cookie else ''
-        
-        if authenticated_cookie == 'true' and username_cookie:
-            # Verify the user still exists
-            users = get_users()
-            if username_cookie in users:
-                st.session_state['authenticated'] = True
-                st.session_state['username'] = username_cookie
-                st.session_state['user_role'] = 'admin' if username_cookie == os.getenv('APP_USERNAME', 'admin') else 'viewer'
-            else:
-                st.session_state['authenticated'] = False
-                st.session_state['username'] = ''
-                st.session_state['user_role'] = 'viewer'
-        else:
-            st.session_state['authenticated'] = False
-            st.session_state['username'] = ''
-            st.session_state['user_role'] = 'viewer'
-    
-    if 'username' not in st.session_state:
+        st.session_state['authenticated'] = False
         st.session_state['username'] = ''
-    if 'user_role' not in st.session_state:
         st.session_state['user_role'] = 'viewer'
 
 def login_screen():
@@ -296,9 +267,6 @@ def login_screen():
                     users[username]['last_login'] = datetime.now().isoformat()
                     users[username]['last_seen'] = datetime.now().isoformat()
                     save_all_users_to_file(users)
-                
-                st.query_params.auth = 'true'
-                st.query_params.user = username
                 
                 logs_acesso.log_acesso(username, 'LOGIN', detalhes='Login realizado com sucesso')
                 st.rerun()
@@ -967,7 +935,6 @@ with st.sidebar:
             st.session_state['authenticated'] = False
             st.session_state['username'] = ''
             st.session_state['user_role'] = 'viewer'
-            st.query_params.clear()
             st.rerun()
     
     # ── ADMIN: LOGS, USUÁRIOS, CRIAR ──
