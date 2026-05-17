@@ -1238,63 +1238,57 @@ with aba_nf:
         
         st.divider()
         st.markdown('<div class="section-title">Tabela completa</div>', unsafe_allow_html=True)
-        colunas_nf = [c for c in ['Data', 'Fornecedor', 'Valor_Real', 'Descricao', 'Status_Consulta_NF'] if c in df_nf_f.columns]
-        df_display = sanitizar_arrow(df_nf_f[colunas_nf].copy()).copy()
-        df_display.insert(0, '🔍', '🔍')
-        for col in df_display.select_dtypes('object').columns:
-            df_display[col] = df_display[col].astype(str).fillna('')
-        if 'Valor_Real' in df_display.columns:
-            df_display['Valor_Real'] = pd.to_numeric(df_display['Valor_Real'], errors='coerce')
-        try:
-            st.dataframe(
-                df_display,
-                width='stretch',
-                hide_index=True,
-                column_config={
-                    '🔍': st.column_config.Column('', width='small'),
-                    'Valor_Real': st.column_config.NumberColumn('Valor', format='R$ %.2f'),
-                    'Descricao': st.column_config.Column('Descrição', width='large'),
-                },
-            )
-        except Exception:
-            if 'Valor_Real' in df_display.columns:
-                df_display['Valor_Real'] = df_display['Valor_Real'].apply(lambda x: moeda_br(x) if pd.notna(x) else '')
-            try:
-                st.dataframe(df_display.astype(str), width='stretch', hide_index=True)
-            except Exception:
-                st.table(df_display.astype(str).fillna('').head(50))
         
-        st.markdown('<div class="section-title">🔍 Ver detalhes de um item</div>', unsafe_allow_html=True)
-        busca_det = st.text_input('Digite data, fornecedor ou descrição', placeholder='Ex: CEMIG, 2025-07, aluguel...', key='busca_detalhes_nf')
-        if busca_det:
-            det = df_nf_f[df_nf_f.apply(lambda r: busca_det.lower() in str(r.get('Data', '')).lower() or busca_det.lower() in str(r.get('Fornecedor', '')).lower() or busca_det.lower() in str(r.get('Descricao', '')).lower(), axis=1)].head(5)
-            if det.empty:
-                st.info('Nenhum item encontrado para essa busca.')
-            else:
-                for _, row in det.iterrows():
-                    tem_img = bool(row.get('Link_NF')) and Path(str(row.get('Link_NF', ''))).exists()
-                    label = f"{'🖼️' if tem_img else '📄'} {str(row.get('Data', ''))} | {html.escape(str(row.get('Fornecedor', '') or '—'))} | {moeda_br(row.get('Valor_Real', 0))}"
-                    with st.expander(label, expanded=False):
-                        c1, c2 = st.columns([1.2, 1])
-                        with c1:
-                            caminho_img = str(row.get('Link_NF', '') or '')
-                            if tem_img:
-                                st.image(caminho_img, caption=Path(caminho_img).name, width='stretch')
-                            else:
-                                st.info('Imagem não disponível (execute a auditoria para gerar)')
-                        with c2:
-                            st.markdown(f"**Fornecedor:** {html.escape(str(row.get('Fornecedor', '')))}")
-                            st.markdown(f"**Descrição:** {html.escape(str(row.get('Descricao', '')))}")
-                            st.markdown(f"**Valor:** {moeda_br(row.get('Valor_Real', 0))}")
-                            st.markdown(f"**Número NF:** `{html.escape(str(row.get('Numero_NF', '') or '—'))}`")
-                            st.markdown(f"**Chave NF:** `{html.escape(str(row.get('Chave_NF', '') or '—'))}`")
-                            st.markdown(f"**Status:** {html.escape(str(row.get('Status_Consulta_NF', '') or '—'))}")
-                            link_origem = str(row.get('Link_Origem_NF', '') or '')
-                            link_consulta = str(row.get('Link_Consulta_NF', '') or '')
-                            if link_origem:
-                                st.link_button('🔗 Link original do balancete', link_origem, width='stretch')
-                            if link_consulta and link_consulta != link_origem:
-                                st.link_button('🔗 Link de consulta/documento', link_consulta, width='stretch')
+        nf_table = df_nf_f.sort_values('Valor_Real', ascending=False).head(50).reset_index(drop=True)
+        
+        if 'nf_expand_idx' not in st.session_state:
+            st.session_state['nf_expand_idx'] = -1
+        
+        hdr = st.columns([0.5, 1.3, 2.2, 1, 2])
+        hdr[0].markdown('**🔍**')
+        hdr[1].markdown('**Data**')
+        hdr[2].markdown('**Fornecedor**')
+        hdr[3].markdown('**Valor**')
+        hdr[4].markdown('**Descrição**')
+        st.markdown('---')
+        
+        for idx in range(len(nf_table)):
+            r = nf_table.iloc[idx]
+            c = st.columns([0.5, 1.3, 2.2, 1, 2])
+            btn_key = f'nf_exp_{idx}'
+            if c[0].button('🔍', key=btn_key, help='Ver detalhes'):
+                st.session_state['nf_expand_idx'] = idx
+                st.rerun()
+            c[1].write(str(r.get('Data', '') or ''))
+            c[2].write(html.escape(str(r.get('Fornecedor', '') or ''))[:45])
+            c[3].write(moeda_br(r.get('Valor_Real', 0)))
+            c[4].write(html.escape(str(r.get('Descricao', '') or ''))[:45])
+        
+        if st.session_state['nf_expand_idx'] >= 0 and st.session_state['nf_expand_idx'] < len(nf_table):
+            row = nf_table.iloc[st.session_state['nf_expand_idx']]
+            tem_img = bool(row.get('Link_NF')) and Path(str(row.get('Link_NF', ''))).exists()
+            label = f"{'🖼️' if tem_img else '📄'} {str(row.get('Data', ''))} | {html.escape(str(row.get('Fornecedor', '') or '—'))} | {moeda_br(row.get('Valor_Real', 0))}"
+            with st.expander(label, expanded=True):
+                c1, c2 = st.columns([1.2, 1])
+                with c1:
+                    caminho_img = str(row.get('Link_NF', '') or '')
+                    if tem_img:
+                        st.image(caminho_img, caption=Path(caminho_img).name, width='stretch')
+                    else:
+                        st.info('Imagem não disponível (execute a auditoria para gerar)')
+                with c2:
+                    st.markdown(f"**Fornecedor:** {html.escape(str(row.get('Fornecedor', '')))}")
+                    st.markdown(f"**Descrição:** {html.escape(str(row.get('Descricao', '')))}")
+                    st.markdown(f"**Valor:** {moeda_br(row.get('Valor_Real', 0))}")
+                    st.markdown(f"**Número NF:** `{html.escape(str(row.get('Numero_NF', '') or '—'))}`")
+                    st.markdown(f"**Chave NF:** `{html.escape(str(row.get('Chave_NF', '') or '—'))}`")
+                    st.markdown(f"**Status:** {html.escape(str(row.get('Status_Consulta_NF', '') or '—'))}")
+                    link_origem = str(row.get('Link_Origem_NF', '') or '')
+                    link_consulta = str(row.get('Link_Consulta_NF', '') or '')
+                    if link_origem:
+                        st.link_button('🔗 Link original do balancete', link_origem, width='stretch')
+                    if link_consulta and link_consulta != link_origem:
+                        st.link_button('🔗 Link de consulta/documento', link_consulta, width='stretch')
 
 with aba_mov:
     st.markdown('<div class="section-title">Movimentações Analíticas</div>', unsafe_allow_html=True)
@@ -1322,59 +1316,52 @@ with aba_mov:
             detalhes = df_mov_f.sort_values('Valor_Real', ascending=False).head(50)
         
         cols_mov = [c for c in ['Data', 'Fornecedor', 'Descricao', 'Valor_Real', 'Categoria', 'Conta', 'Tipo_Movimento'] if c in df_mov_f.columns]
-        df_mov_display = sanitizar_arrow(detalhes[cols_mov].copy()).copy()
-        df_mov_display.insert(0, '🔍', '🔍')
-        for col in df_mov_display.select_dtypes('object').columns:
-            df_mov_display[col] = df_mov_display[col].astype(str).fillna('')
-        if 'Valor_Real' in df_mov_display.columns:
-            df_mov_display['Valor_Real'] = pd.to_numeric(df_mov_display['Valor_Real'], errors='coerce')
-        try:
-            st.dataframe(
-                df_mov_display,
-                width='stretch',
-                hide_index=True,
-                column_config={
-                    '🔍': st.column_config.Column('', width='small'),
-                    'Valor_Real': st.column_config.NumberColumn('Valor', format='R$ %.2f'),
-                    'Descricao': st.column_config.Column('Descrição', width='large'),
-                },
-            )
-        except Exception:
-            if 'Valor_Real' in df_mov_display.columns:
-                df_mov_display['Valor_Real'] = df_mov_display['Valor_Real'].apply(lambda x: moeda_br(x) if pd.notna(x) else '')
-            try:
-                st.dataframe(df_mov_display.astype(str), width='stretch', hide_index=True)
-            except Exception:
-                st.table(df_mov_display.astype(str).fillna('').head(50))
         
-        st.markdown('<div class="section-title">🔍 Ver detalhes de um item</div>', unsafe_allow_html=True)
-        busca_det = st.text_input('Digite data, fornecedor ou descrição', placeholder='Ex: CEMIG, 2025-07, aluguel...', key='busca_detalhes_mov')
-        if busca_det:
-            det = detalhes[detalhes.apply(lambda r: busca_det.lower() in str(r.get('Data', '')).lower() or busca_det.lower() in str(r.get('Fornecedor', '')).lower() or busca_det.lower() in str(r.get('Descricao', '')).lower(), axis=1)].head(5)
-            if det.empty:
-                st.info('Nenhum item encontrado para essa busca.')
-            else:
-                for _, row in det.iterrows():
-                    tem_img = bool(row.get('Link_NF')) and Path(str(row.get('Link_NF', ''))).exists()
-                    label = f"{'🖼️' if tem_img else '📄'} {str(row.get('Data', ''))} | {html.escape(str(row.get('Fornecedor', '') or '—'))} | {moeda_br(row.get('Valor_Real', 0))}"
-                    with st.expander(label, expanded=False):
-                        c1, c2 = st.columns([1.2, 1])
-                        with c1:
-                            caminho_img = str(row.get('Link_NF', '') or '')
-                            if tem_img:
-                                st.image(caminho_img, caption=Path(caminho_img).name, width='stretch')
-                            else:
-                                st.info('Imagem não disponível')
-                        with c2:
-                            st.markdown(f"**Fornecedor:** {html.escape(str(row.get('Fornecedor', '')))}")
-                            st.markdown(f"**Descrição:** {html.escape(str(row.get('Descricao', '')))}")
-                            st.markdown(f"**Valor:** {moeda_br(row.get('Valor_Real', 0))}")
-                            st.markdown(f"**Categoria:** {html.escape(str(row.get('Categoria', '') or '—'))}")
-                            st.markdown(f"**Conta:** {html.escape(str(row.get('Conta', '') or '—'))}")
-                            st.markdown(f"**Tipo:** {html.escape(str(row.get('Tipo_Movimento', '') or '—'))}")
-                            lnk = str(row.get('Link_Origem_NF', '') or '')
-                            if lnk:
-                                st.link_button('🔗 Link original', lnk, width='stretch')
+        if 'mov_expand_idx' not in st.session_state:
+            st.session_state['mov_expand_idx'] = -1
+        
+        hdr = st.columns([0.5, 1.3, 2.2, 1, 2])
+        hdr[0].markdown('**🔍**')
+        hdr[1].markdown('**Data**')
+        hdr[2].markdown('**Fornecedor**')
+        hdr[3].markdown('**Valor**')
+        hdr[4].markdown('**Descrição**')
+        st.markdown('---')
+        
+        for idx in range(len(detalhes)):
+            r = detalhes.iloc[idx]
+            c = st.columns([0.5, 1.3, 2.2, 1, 2])
+            btn_key = f'mov_exp_{idx}'
+            if c[0].button('🔍', key=btn_key, help='Ver detalhes'):
+                st.session_state['mov_expand_idx'] = idx
+                st.rerun()
+            c[1].write(str(r.get('Data', '') or ''))
+            c[2].write(html.escape(str(r.get('Fornecedor', '') or ''))[:45])
+            c[3].write(moeda_br(r.get('Valor_Real', 0)))
+            c[4].write(html.escape(str(r.get('Descricao', '') or ''))[:45])
+        
+        if st.session_state['mov_expand_idx'] >= 0 and st.session_state['mov_expand_idx'] < len(detalhes):
+            row = detalhes.iloc[st.session_state['mov_expand_idx']]
+            tem_img = bool(row.get('Link_NF')) and Path(str(row.get('Link_NF', ''))).exists()
+            label = f"{'🖼️' if tem_img else '📄'} {str(row.get('Data', ''))} | {html.escape(str(row.get('Fornecedor', '') or '—'))} | {moeda_br(row.get('Valor_Real', 0))}"
+            with st.expander(label, expanded=True):
+                c1, c2 = st.columns([1.2, 1])
+                with c1:
+                    p = str(row.get('Link_NF', '') or '')
+                    if tem_img:
+                        st.image(p, caption=Path(p).name, width='stretch')
+                    else:
+                        st.info('Imagem não disponível')
+                with c2:
+                    st.markdown(f"**Fornecedor:** {html.escape(str(row.get('Fornecedor', '')))}")
+                    st.markdown(f"**Descrição:** {html.escape(str(row.get('Descricao', '')))}")
+                    st.markdown(f"**Valor:** {moeda_br(row.get('Valor_Real', 0))}")
+                    st.markdown(f"**Categoria:** {html.escape(str(row.get('Categoria', '') or '—'))}")
+                    st.markdown(f"**Conta:** {html.escape(str(row.get('Conta', '') or '—'))}")
+                    st.markdown(f"**Tipo:** {html.escape(str(row.get('Tipo_Movimento', '') or '—'))}")
+                    lnk = str(row.get('Link_Origem_NF', '') or '')
+                    if lnk:
+                        st.link_button('🔗 Link original', lnk, width='stretch')
     
 with aba_cob:
     st.markdown('<div class="section-title">Composição das Cobranças</div>', unsafe_allow_html=True)
