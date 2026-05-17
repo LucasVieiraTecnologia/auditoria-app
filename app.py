@@ -328,7 +328,7 @@ PLOTLY_LAYOUT = dict(
     paper_bgcolor='rgba(255,255,255,0)',
     plot_bgcolor='rgba(248,250,252,0.72)',
     font=dict(family='Inter, Segoe UI, Arial, sans-serif', color='#0f172a'),
-    margin=dict(l=24, r=18, t=34, b=24),
+    margin=dict(l=24, r=18, t=80, b=24),
     hoverlabel=dict(bgcolor='#0f172a', font_color='#f8fafc', bordercolor='#1e293b'),
     legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0),
 )
@@ -1458,7 +1458,7 @@ with aba_mov:
             contas_filtro = contas_sel if contas_sel else contas
             grp = grp_all[grp_all['Conta'].astype(str).isin(contas_filtro)]
             n_contas = len(contas_filtro)
-            fig = px.bar(grp, x='Mes_Ano', y='Valor', color='Tipo_Movimento', facet_col='Conta', facet_col_wrap=min(3, n_contas), height=260 * ((n_contas - 1) // 3 + 2), title='Movimentação analítica por conata', color_discrete_map={'Entrada': COR_ENTRADA, 'Saída': COR_SAIDA, 'Transferência': COR_TRANSFERENCIA})
+            fig = px.bar(grp, x='Mes_Ano', y='Valor', color='Tipo_Movimento', facet_col='Conta', facet_col_wrap=min(3, n_contas), height=260 * ((n_contas - 1) // 3 + 2),  color_discrete_map={'Entrada': COR_ENTRADA, 'Saída': COR_SAIDA, 'Transferência': COR_TRANSFERENCIA})
             formatar_fig(fig, height=260 * ((n_contas - 1) // 3 + 2), moeda=True)
             st.plotly_chart(fig, width='stretch')
         
