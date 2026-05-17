@@ -1173,6 +1173,8 @@ with aba_cat:
         st.dataframe(preparar_exibicao(df_cat_f), width='stretch', hide_index=True)
     except Exception:
         st.table(preparar_exibicao(df_cat_f).astype(str).head(50))
+
+with aba_nf:
     st.markdown('<div class="section-title">Notas fiscais e comprovantes vinculados</div><div class="section-sub">Imagens extraídas dos PDFs, número da nota, chave de acesso, status da consulta e vínculo por valor com a movimentação.</div>', unsafe_allow_html=True)
     if df_nf_f.empty:
         st.info('Nenhuma nota fiscal ou comprovante foi vinculado às movimentações filtradas ainda.')
