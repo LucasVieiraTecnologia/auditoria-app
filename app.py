@@ -1220,97 +1220,71 @@ with aba_nf:
             st.plotly_chart(fig, width='stretch')
 
         df_nf_view = df_nf_f.reset_index(drop=True).copy()
-        df_nf_view['_forn'] = df_nf_view.get('Fornecedor', pd.Series(['']*len(df_nf_view))).apply(lambda x: str(x).strip() if pd.notna(x) and str(x).strip() != '' else 'Sem fornecedor')
-        df_nf_view['_desc'] = df_nf_view.get('Descricao', pd.Series(['']*len(df_nf_view))).apply(lambda x: str(x).strip() if pd.notna(x) else '')
-        df_nf_view['Item'] = df_nf_view.apply(lambda row: f"{row.get('Data', '')} | {row['_forn']} | {moeda_br(row.get('Valor_Real', 0))} | {row['_desc'][:80]}", axis=1)
+        df_nf_view['_forn'] = df_nf_view.get('Fornecedor', pd.Series(['']*len(df_nf_view))).apply(
+            lambda x: str(x).strip() if pd.notna(x) and str(x).strip() != '' else 'Sem fornecedor')
+        df_nf_view['_desc'] = df_nf_view.get('Descricao', pd.Series(['']*len(df_nf_view))).apply(
+            lambda x: str(x).strip()[:80] if pd.notna(x) else '')
+        df_nf_view['_tem_img'] = df_nf_view.get('Link_NF', pd.Series(['']*len(df_nf_view))).apply(
+            lambda x: bool(x) and Path(str(x)).exists())
         
-        busca = st.text_input('🔍 Buscar nota/despesa', placeholder='Filtrar por fornecedor, descrição ou valor...')
-        itens_filtrados = [i for i in df_nf_view['Item'].tolist() if busca.lower() in i.lower()] if busca else df_nf_view['Item'].tolist()
-        item_sel = st.selectbox('Clique/escolha uma nota ou despesa para abrir os detalhes', itens_filtrados if itens_filtrados else ['Nenhum resultado'], index=0)
-        if not itens_filtrados:
-            st.info('Nenhum item encontrado para essa busca.')
-        row_sel = df_nf_view[df_nf_view['Item'] == item_sel].iloc[0] if itens_filtrados else df_nf_view.iloc[0]
-        detalhe_ctx = st.popover('Abrir imagem e dados da nota', use_container_width=True) if hasattr(st, 'popover') else st.expander('Abrir imagem e dados da nota', expanded=True)
-        with detalhe_ctx:
-            d1, d2 = st.columns([1.1, 1])
-            with d1:
-                caminho_img = str(row_sel.get('Link_NF', '') or '')
-                if caminho_img and Path(caminho_img).exists():
-                    st.image(caminho_img, caption=Path(caminho_img).name, width='stretch')
-                else:
-                    st.info('Imagem vinculada não encontrada no disco.')
-            with d2:
-                st.markdown(f"**Fornecedor:** {html.escape(str(row_sel.get('Fornecedor', '')))}")
-                st.markdown(f"**Descrição:** {html.escape(str(row_sel.get('Descricao', '')))}")
-                st.markdown(f"**Valor:** {moeda_br(row_sel.get('Valor_Real', 0))}")
-                st.markdown(f"**Número NF:** `{html.escape(str(row_sel.get('Numero_NF', '') or 'Não identificado'))}`")
-                st.markdown(f"**Chave NF:** `{html.escape(str(row_sel.get('Chave_NF', '') or 'Não identificada'))}`")
-                st.markdown(f"**Status:** {html.escape(str(row_sel.get('Status_Consulta_NF', '') or 'Sem status'))}")
-                link_origem = str(row_sel.get('Link_Origem_NF', '') or '')
-                link_consulta = str(row_sel.get('Link_Consulta_NF', '') or '')
-                arquivo_baixado = str(row_sel.get('Arquivo_NF_Baixado', '') or '')
-                chave_nf = str(row_sel.get('Chave_NF', '') or '')
-                numero_nf = str(row_sel.get('Numero_NF', '') or '')
-                cnpj = str(row_sel.get('CNPJ', '') or '')
-                fornecedor = str(row_sel.get('Fornecedor', '') or '')
-                descricao = str(row_sel.get('Descricao', '') or '')
-                categoria = str(row_sel.get('Categoria', '') or '')
-                valor = float(row_sel.get('Valor_Real', 0) or 0)
-                if link_origem:
-                    st.link_button('Abrir link original do balancete', link_origem, width='stretch')
-                if link_consulta and link_consulta != link_origem:
-                    st.link_button('Abrir link de consulta/documento', link_consulta, width='stretch')
-                label_verif, url_verif = gerar_link_verificacao_nf(chave_nf, numero_nf, categoria)
-                st.link_button(label_verif, url_verif, width='stretch')
-                google_url = f'https://www.google.com/search?q={html.escape(fornecedor or descricao)}+CNPJ+{cnpj}'
-                st.link_button('Pesquisar empresa no Google', google_url, width='stretch')
-                if cnpj and len(re.sub(r'\D', '', cnpj)) == 14:
-                    with st.spinner('Buscando dados da empresa...'):
-                        dados_empresa = buscar_empresa_cnpj(cnpj)
-                    if dados_empresa:
-                        st.markdown(f"**Razão Social:** {html.escape(dados_empresa.get('razao_social', ''))}")
-                        st.markdown(f"**Nome Fantasia:** {html.escape(dados_empresa.get('nome_fantasia', ''))}")
-                        st.markdown(f"**Situação:** {html.escape(dados_empresa.get('situacao', ''))}")
-                        st.markdown(f"**Atividade:** {html.escape(dados_empresa.get('atividade', ''))}")
-                        st.markdown(f"**Endereço:** {html.escape(dados_empresa.get('endereco', ''))}")
-                if arquivo_baixado and Path(arquivo_baixado).exists():
-                    with open(arquivo_baixado, 'rb') as f:
-                        st.download_button('Baixar documento arquivado', f, file_name=Path(arquivo_baixado).name, width='stretch')
-                if st.button('Explicar com IA', key=f'ia_{item_sel[:30]}'):
-                    with st.spinner('Analisando item...'):
-                        explicacao = explicar_item_ia(fornecedor, descricao, valor, categoria, cnpj)
-                    st.markdown(f'<div class="ai-card"><strong>Análise IA</strong><br>{html.escape(explicacao)}</div>', unsafe_allow_html=True)
-
+        busca = st.text_input('🔍 Buscar nota/despesa', placeholder='Filtrar por fornecedor, descrição...')
+        filtro = df_nf_view
+        if busca:
+            filtro = df_nf_view[df_nf_view['_forn'].str.lower().str.contains(busca.lower()) |
+                                df_nf_view['_desc'].str.lower().str.contains(busca.lower())]
+        
+        st.caption(f'{len(filtro)} item(ns) encontrado(s)  ·  {filtro["_tem_img"].sum()} com imagem')
+        
+        MAX_EXP = 80
+        for idx, (_, row) in enumerate(filtro.head(MAX_EXP).iterrows()):
+            tem_img = row['_tem_img']
+            label = f"{'🖼️' if tem_img else '📄'} {row.get('Data', '')} | {row['_forn']} | {moeda_br(row.get('Valor_Real', 0))}"
+            with st.expander(label, expanded=False):
+                c1, c2 = st.columns([1.2, 1])
+                with c1:
+                    caminho_img = str(row.get('Link_NF', '') or '')
+                    if tem_img:
+                        st.image(caminho_img, caption=Path(caminho_img).name, width='stretch')
+                    else:
+                        st.info('Imagem não disponível no momento (execute a auditoria para gerar)')
+                with c2:
+                    st.markdown(f"**Fornecedor:** {html.escape(str(row.get('Fornecedor', '')))}")
+                    st.markdown(f"**Descrição:** {html.escape(str(row.get('Descricao', '')))}")
+                    st.markdown(f"**Valor:** {moeda_br(row.get('Valor_Real', 0))}")
+                    st.markdown(f"**Número NF:** `{html.escape(str(row.get('Numero_NF', '') or '—'))}`")
+                    st.markdown(f"**Chave NF:** `{html.escape(str(row.get('Chave_NF', '') or '—'))}`")
+                    st.markdown(f"**Status:** {html.escape(str(row.get('Status_Consulta_NF', '') or '—'))}")
+                    link_origem = str(row.get('Link_Origem_NF', '') or '')
+                    link_consulta = str(row.get('Link_Consulta_NF', '') or '')
+                    if link_origem:
+                        st.link_button('🔗 Link original do balancete', link_origem, width='stretch')
+                    if link_consulta and link_consulta != link_origem:
+                        st.link_button('🔗 Link de consulta/documento', link_consulta, width='stretch')
+        
+        if len(filtro) > MAX_EXP:
+            st.caption(f'Mostrando {MAX_EXP} de {len(filtro)} itens. Refine a busca para ver mais.')
+        
+        st.divider()
+        st.markdown('<div class="section-title">Tabela completa</div>', unsafe_allow_html=True)
         colunas_nf = [c for c in ['Data', 'Fornecedor', 'Descricao', 'Valor_Real', 'Numero_NF', 'Chave_NF', 'Status_Consulta_NF', 'Link_Consulta_NF', 'Link_Origem_NF', 'Arquivo_NF_Baixado', 'Link_NF'] if c in df_nf_f.columns]
-        df_display = preparar_exibicao(df_nf_f[colunas_nf]).copy()
-        df_display = sanitizar_arrow(df_display)
-        
-        # Ensure link columns contain only strings
+        df_display = sanitizar_arrow(preparar_exibicao(df_nf_f[colunas_nf]).copy())
         for col in ['Link_Consulta_NF', 'Link_Origem_NF']:
             if col in df_display.columns:
-                df_display[col] = df_display[col].apply(
-                    lambda x: str(x).strip() if pd.notna(x) and str(x).strip() != '' else ''
-                )
-        
+                df_display[col] = df_display[col].apply(lambda x: str(x).strip() if pd.notna(x) and str(x).strip() != '' else '')
         try:
-            st.dataframe(
-                df_display.astype(str),
-                width='stretch',
-                hide_index=True,
-            )
-        except Exception as e:
-            st.error(f"Erro: {str(e)[:80]}")
+            st.dataframe(df_display.astype(str), width='stretch', hide_index=True)
+        except Exception:
             try:
                 st.table(df_display.astype(str).fillna('').head(50))
             except Exception:
                 st.warning('Não foi possível exibir a tabela.')
-
+        
         imagens = [p for p in df_nf_f['Link_NF'].dropna().astype(str).unique().tolist() if Path(p).exists()] if 'Link_NF' in df_nf_f.columns else []
         if imagens:
             st.markdown('<div class="section-title">Amostra das imagens extraídas</div>', unsafe_allow_html=True)
-            cols_img = st.columns(3)
-            for idx, caminho in enumerate(imagens[:6]):
-                with cols_img[idx % 3]:
+            cols_img = st.columns(4)
+            for idx, caminho in enumerate(imagens[:12]):
+                with cols_img[idx % 4]:
                     st.image(caminho, caption=Path(caminho).name, width='stretch')
 
 with aba_mov:
@@ -1343,6 +1317,19 @@ with aba_mov:
         st.dataframe(sanitizar_arrow(preparar_exibicao(df_mov_f)), width='stretch', hide_index=True)
     except Exception:
         st.table(preparar_exibicao(df_mov_f).astype(str).head(50))
+    
+    # Quick-access NF images in the movimentações tab
+    if not df_nf_f.empty and 'Link_NF' in df_nf_f.columns:
+        st.markdown(f'<div class="section-title">🖼️ Notas fiscais vinculadas ({qtd_nf})</div>', unsafe_allow_html=True)
+        imgs_mov = [(p, Path(p)) for p in df_nf_f['Link_NF'].dropna().astype(str).unique().tolist() if p and Path(p).exists()]
+        if imgs_mov:
+            cols = st.columns(6)
+            for i, (path, pp) in enumerate(imgs_mov[:18]):
+                with cols[i % 6]:
+                    st.image(path, caption=pp.name[:20], width='stretch')
+        else:
+            st.caption('Execute a auditoria para gerar as imagens das notas fiscais.')
+    
 with aba_cob:
     st.markdown('<div class="section-title">Composição das Cobranças</div>', unsafe_allow_html=True)
     if not df_cob_f.empty and {'Bloco', 'Valor'}.issubset(df_cob_f.columns):
